@@ -1,0 +1,74 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://localhost:7071/api/hooks/claude-code",
+            "headers": { "X-User-Email": "$USER_EMAIL" },
+            "allowedEnvVars": ["USER_EMAIL"],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://localhost:7071/api/hooks/claude-code",
+            "headers": { "X-User-Email": "$USER_EMAIL" },
+            "allowedEnvVars": ["USER_EMAIL"],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://localhost:7071/api/hooks/claude-code",
+            "headers": { "X-User-Email": "$USER_EMAIL" },
+            "allowedEnvVars": ["USER_EMAIL"],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://localhost:7071/api/hooks/claude-code",
+            "headers": { "X-User-Email": "$USER_EMAIL" },
+            "allowedEnvVars": ["USER_EMAIL"],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://localhost:7071/api/hooks/claude-code",
+            "headers": { "X-User-Email": "$USER_EMAIL" },
+            "allowedEnvVars": ["USER_EMAIL"],
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

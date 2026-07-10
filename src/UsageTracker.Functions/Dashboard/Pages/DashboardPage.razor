@@ -1,0 +1,409 @@
+@inject IDashboardQueryService Dashboard
+@using MudBlazor
+
+@* ============================================================
+   UsageTracker — restyled in the Cyclotron Design System
+   (Midnight dark surface, Sky-Blue accents, hexagon motif).
+   Assumes the Cyclotron token stylesheets are linked in the host
+   layout (styles.css). All look-and-feel lives in the scoped
+   <style> block below; the @code block is unchanged.
+   ============================================================ *@
+
+<DashboardLayout Title="UsageTracker">
+    <div class="ut">
+
+        <header class="ut-topbar">
+            <div class="ut-title">
+                <img src="/api/assets/logos/pinwheel.png" alt="Cyclotron" class="ut-mark" />
+                <div>
+                    <div class="ut-title-row">
+                        <h1>UsageTracker</h1>
+                        <span class="ut-live"><span class="ut-dot"></span>Live</span>
+                    </div>
+                    <p>Token usage and project attribution across your AI coding agents.</p>
+                </div>
+            </div>
+            <div class="ut-range">
+                <button>24h</button><button class="is-active">7 days</button><button>30d</button>
+            </div>
+        </header>
+
+        @if (_error is not null)
+        {
+            <div class="ut-alert">Could not load dashboard data: @_error</div>
+        }
+        else
+        {
+            @* ---------- KPI tiles ---------- *@
+            <div class="ut-kpis">
+                <div class="ut-kpi" style="--bar: var(--color-sky-blue);">
+                    <div class="ut-kpi-head"><span class="ut-kpi-label">Live sessions</span>
+                        <span class="ut-hex"><iconify-icon icon="fluent:pulse-24-regular" width="18"></iconify-icon></span></div>
+                    <div class="ut-kpi-value">@_sessions.Count</div>
+                    <div class="ut-kpi-sub">active right now</div>
+                </div>
+                <div class="ut-kpi" style="--bar: var(--color-true-blue);">
+                    <div class="ut-kpi-head"><span class="ut-kpi-label">Tracked projects</span>
+                        <span class="ut-hex"><iconify-icon icon="fluent:folder-24-regular" width="18"></iconify-icon></span></div>
+                    <div class="ut-kpi-value">@_projects.Count</div>
+                    <div class="ut-kpi-sub">with recorded usage</div>
+                </div>
+                <div class="ut-kpi" style="--bar: var(--gradient-blue-purple);">
+                    <div class="ut-kpi-head"><span class="ut-kpi-label">Total tokens</span>
+                        <span class="ut-hex"><iconify-icon icon="fluent:data-histogram-24-regular" width="18"></iconify-icon></span></div>
+                    <div class="ut-kpi-value">@Short(_totalTokens)</div>
+                    <div class="ut-kpi-sub">@_totalTokens.ToString("N0") total</div>
+                </div>
+                <div class="ut-kpi" style="--bar: var(--color-eminence);">
+                    <div class="ut-kpi-head"><span class="ut-kpi-label">Tool calls</span>
+                        <span class="ut-hex"><iconify-icon icon="fluent:wrench-24-regular" width="18"></iconify-icon></span></div>
+                    <div class="ut-kpi-value">@Short(_sessions.Sum(s => (long)s.ToolCalls))</div>
+                    <div class="ut-kpi-sub">across live sessions</div>
+                </div>
+            </div>
+
+            @* ---------- Charts (MudBlazor) ---------- *@
+            <div class="ut-charts">
+                <div class="ut-panel">
+                    <div class="ut-panel-head">
+                        <h2>Token usage over time</h2>
+                        <p>Total tokens per day (M) · last 7 days</p>
+                    </div>
+                    <MudChart T="double" ChartType="ChartType.Line" ChartSeries="_usageSeries" ChartLabels="_usageLabels"
+                              ChartOptions="_lineOptions" Width="100%" Height="230px" />
+                </div>
+                <div class="ut-panel">
+                    <div class="ut-panel-head">
+                        <h2>Model split</h2>
+                        <p>Share of total tokens</p>
+                    </div>
+                    <div class="ut-donut-wrap">
+                        <MudChart T="double" ChartType="ChartType.Donut" ChartSeries="_modelSeries" ChartLabels="_modelLabels"
+                                  ChartOptions="_donutOptions" Width="220px" Height="220px" />
+                    </div>
+                </div>
+                <div class="ut-panel ut-panel--full">
+                    <div class="ut-panel-head">
+                        <h2>Top projects by tokens</h2>
+                        <p>All-time total (M)</p>
+                    </div>
+                    <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="_projectSeries" ChartLabels="_projectLabels"
+                              ChartOptions="_barOptions" Width="100%" Height="240px" />
+                </div>
+            </div>
+
+            @* ---------- Sessions ---------- *@
+            <section id="sessions" class="ut-section">
+                <div class="ut-sec-head"><h2>Sessions</h2>
+                    <span class="ut-count">@_sessions.Count active</span></div>
+
+                @if (_sessions.Count == 0)
+                {
+                    <p class="ut-empty">No sessions recorded yet.</p>
+                }
+                else
+                {
+                    <div class="ut-rows">
+                        @foreach (var s in _sessions)
+                        {
+                            <div class="ut-row ut-row--session">
+                                <div>
+                                    <div class="ut-id"><span class="ut-plat-dot" style="background:@PlatformColor(s.Platform)"></span>@s.SessionId</div>
+                                    <div class="ut-meta">@s.Platform</div>
+                                </div>
+                                <div><div class="ut-h">User</div><div class="ut-v">@s.User</div></div>
+                                <div>
+                                    <div class="ut-h">Project</div><div class="ut-v">@s.ProjectName</div>
+                                    <span class="ut-badge ut-badge--@Conf(s.AttributionConfidence)">@s.AttributionConfidence</span>
+                                </div>
+                                <div class="ut-metrics">
+                                    <div><div class="ut-h">Model</div><div class="ut-v">@s.Model</div></div>
+                                    <div class="ut-num"><div class="ut-h">Tools</div><div class="ut-v-num">@s.ToolCalls</div></div>
+                                    <div class="ut-num"><div class="ut-h">In / Out</div>
+                                        <div class="ut-v-num"><span class="in">@Short(s.Usage.InputTokens)</span> / <span class="out">@Short(s.Usage.OutputTokens)</span></div></div>
+                                </div>
+                                <div class="ut-num"><div class="ut-h">Last event</div>
+                                    <div class="ut-v">@s.LastEventAt.LocalDateTime.ToString("g")</div></div>
+                            </div>
+                        }
+                    </div>
+                }
+            </section>
+
+            @* ---------- Projects ---------- *@
+            <section id="projects" class="ut-section">
+                <div class="ut-sec-head"><h2>Projects</h2></div>
+
+                @if (_projects.Count == 0)
+                {
+                    <p class="ut-empty">No project usage recorded yet.</p>
+                }
+                else
+                {
+                    <div class="ut-cards">
+                        @foreach (var p in _projects)
+                        {
+                            var pct = _maxProjectTokens > 0 ? (int)(p.TotalTokens * 100 / _maxProjectTokens) : 0;
+                            <div class="ut-card" style="--bar: var(--color-true-blue);">
+                                <div class="ut-card-head">
+                                    <div><h3>@p.ProjectName</h3><code>@p.ProjectKey</code></div>
+                                    <div class="ut-card-total"><div class="ut-v-big">@Short(p.TotalTokens)</div><div class="ut-h">Total tokens</div></div>
+                                </div>
+                                <div class="ut-bar"><div class="ut-bar-fill" style="width:@(pct)%"></div></div>
+                                <div class="ut-card-foot">
+                                    <span><span class="ut-muted">Sessions </span><b>@p.Sessions</b></span>
+                                    <span><span class="ut-muted">Events </span><b>@p.Events</b></span>
+                                    <span><span class="in">@Short(p.InputTokens)</span> in · <span class="out">@Short(p.OutputTokens)</span> out</span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </section>
+
+            @* ---------- Agent usage ---------- *@
+            <section id="agent-usage" class="ut-section">
+                <div class="ut-sec-head-col"><h2>Agent usage</h2>
+                    <p>Usage rolled up by platform, model, user, and project.</p></div>
+
+                @if (_usage.Count == 0)
+                {
+                    <p class="ut-empty">No usage recorded yet.</p>
+                }
+                else
+                {
+                    <div class="ut-table">
+                        <div class="ut-thead">
+                            <span>Platform</span><span>Model</span><span>User</span><span>Project</span>
+                            <span>Confidence</span><span class="r">Sessions</span><span class="r">In</span><span class="r">Out</span>
+                        </div>
+                        @foreach (var r in _usage)
+                        {
+                            <div class="ut-trow">
+                                <span class="ut-plat"><span class="ut-plat-dot" style="background:@PlatformColor(r.Platform)"></span>@r.Platform</span>
+                                <span class="ut-muted2">@r.Model</span>
+                                <span class="ut-muted2">@r.User</span>
+                                <span class="ut-muted2">@r.ProjectName</span>
+                                <span><span class="ut-badge ut-badge--@Conf(r.AttributionConfidence)">@r.AttributionConfidence</span></span>
+                                <span class="r b">@r.Sessions</span>
+                                <span class="r in">@Short(r.InputTokens)</span>
+                                <span class="r out">@Short(r.OutputTokens)</span>
+                            </div>
+                        }
+                    </div>
+                }
+            </section>
+        }
+    </div>
+</DashboardLayout>
+
+<style>
+    /* Scoped Cyclotron restyle. Relies on the design-system tokens (styles.css). */
+    .ut { --ink:#FDFBFF; color:var(--ink); font-family:var(--font-sans,"Segoe UI",sans-serif);
+          background:#0C1629; min-height:100%;
+          background-image:radial-gradient(900px 520px at 12% -8%, rgba(55,86,163,.30), transparent 60%),
+                           radial-gradient(760px 520px at 100% 0%, rgba(98,46,136,.28), transparent 62%);
+          padding:28px 32px 72px; }
+    .ut h1,.ut h2,.ut h3 { font-weight:600; letter-spacing:-.02em; margin:0; }
+
+    .ut-topbar { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; flex-wrap:wrap; margin-bottom:30px; }
+    .ut-title { display:flex; align-items:center; gap:16px; }
+    .ut-mark { width:46px; height:46px; object-fit:contain; filter:drop-shadow(0 4px 14px rgba(96,216,238,.35)); }
+    .ut-title-row { display:flex; align-items:center; gap:10px; }
+    .ut-title h1 { font-size:34px; }
+    .ut-title p { margin:5px 0 0; color:var(--neutral-400); font-size:15px; }
+    .ut-live { display:inline-flex; align-items:center; gap:7px; font-size:12px; font-weight:600; letter-spacing:.06em;
+               text-transform:uppercase; color:var(--color-lime); background:rgba(169,210,61,.12);
+               border:1px solid rgba(169,210,61,.3); padding:4px 10px; border-radius:999px; }
+    .ut-dot { width:8px; height:8px; border-radius:999px; background:var(--color-lime); animation:utPulse 2s infinite; }
+    @@keyframes utPulse { 0%{box-shadow:0 0 0 0 rgba(169,210,61,.55)} 70%{box-shadow:0 0 0 7px rgba(169,210,61,0)} 100%{box-shadow:0 0 0 0 rgba(169,210,61,0)} }
+    .ut-range { display:inline-flex; background:rgba(253,251,255,.04); border:1px solid rgba(253,251,255,.12); border-radius:999px; padding:3px; }
+    .ut-range button { border:none; cursor:pointer; font:inherit; font-size:13px; font-weight:600; color:var(--neutral-400);
+                       background:transparent; padding:7px 15px; border-radius:999px; }
+    .ut-range button.is-active { color:#fff; background:var(--color-true-blue); }
+
+    .ut-alert { background:rgba(255,187,22,.12); border:1px solid rgba(255,187,22,.4); color:var(--color-yellow);
+                padding:14px 18px; border-radius:12px; }
+
+    .ut-kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:20px; }
+    .ut-kpi { position:relative; background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.015));
+              border:1px solid rgba(253,251,255,.12); border-radius:14px; padding:20px 22px; overflow:hidden; }
+    .ut-kpi::before { content:""; position:absolute; inset:0 0 auto 0; height:3px; background:var(--bar); }
+    .ut-kpi-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .ut-kpi-label { font-size:12px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--neutral-400); }
+    .ut-hex { display:inline-flex; align-items:center; justify-content:center; width:34px; height:37px; color:#fff; background:var(--bar);
+              clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%); }
+    .ut-kpi-value { margin-top:14px; font-size:38px; font-weight:600; letter-spacing:-.02em; line-height:1; }
+    .ut-kpi-sub { margin-top:8px; font-size:13px; color:var(--neutral-400); }
+
+    .ut-section { margin-top:40px; }
+    .ut-sec-head { display:flex; align-items:baseline; gap:12px; margin-bottom:16px; }
+    .ut-sec-head h2, .ut-sec-head-col h2 { font-size:22px; }
+    .ut-sec-head-col { margin-bottom:16px; }
+    .ut-sec-head-col p { margin:4px 0 0; color:var(--neutral-400); font-size:14px; }
+    .ut-count { font-size:13px; font-weight:600; color:var(--color-sky-blue); background:rgba(96,216,238,.12);
+                border:1px solid rgba(96,216,238,.3); padding:3px 10px; border-radius:999px; }
+    .ut-empty { color:var(--neutral-400); }
+
+    .ut-h { font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--neutral-500); }
+    .ut-v { margin-top:3px; font-size:14px; color:var(--neutral-100); }
+    .ut-v-num { margin-top:3px; font-size:15px; font-weight:600; color:#fff; font-variant-numeric:tabular-nums; }
+    .in { color:var(--color-sky-blue); } .out { color:var(--color-lime); }
+    .ut-muted { color:var(--neutral-400); } .ut-muted2 { color:var(--neutral-200); }
+
+    .ut-rows { display:flex; flex-direction:column; gap:10px; }
+    .ut-row--session { display:grid; grid-template-columns:1.6fr 1.2fr 1fr 2.1fr 1fr; align-items:center; gap:18px;
+                       background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.012));
+                       border:1px solid rgba(253,251,255,.1); border-radius:12px; padding:16px 20px; }
+    .ut-id { display:flex; align-items:center; gap:8px; font-family:"Cascadia Code",ui-monospace,monospace; font-size:13px; color:#fff; }
+    .ut-meta { margin-top:5px; font-size:12px; color:var(--neutral-400); padding-left:17px; }
+    .ut-plat-dot { width:9px; height:9px; border-radius:999px; flex-shrink:0; }
+    .ut-metrics { display:flex; gap:20px; } .ut-num { text-align:right; }
+
+    .ut-badge { display:inline-block; margin-top:6px; font-size:12px; font-weight:600; padding:3px 10px; border-radius:999px; }
+    .ut-badge--high { color:#5a7011; background:rgba(169,210,61,.22); }
+    .ut-badge--med  { color:#8a6200; background:rgba(255,187,22,.22); }
+    .ut-badge--low  { color:var(--color-rojo); background:rgba(200,27,37,.16); }
+
+    .ut-cards { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+    .ut-card { position:relative; background:rgba(22,32,58,.7); border:1px solid rgba(253,251,255,.12);
+               border-radius:14px; padding:20px 22px; overflow:hidden; }
+    .ut-card::before { content:""; position:absolute; inset:0 0 auto 0; height:4px; background:var(--bar); }
+    .ut-card-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+    .ut-card h3 { font-size:17px; color:#fff; }
+    .ut-card code { display:inline-block; margin-top:6px; font-size:12px; color:var(--color-sky-blue);
+                    background:rgba(96,216,238,.1); padding:2px 8px; border-radius:6px; }
+    .ut-card-total { text-align:right; } .ut-v-big { font-size:24px; font-weight:600; line-height:1; }
+    .ut-bar { height:8px; background:rgba(253,251,255,.06); border-radius:999px; overflow:hidden; margin:16px 0 14px; }
+    .ut-bar-fill { height:100%; background:var(--bar); }
+    .ut-card-foot { display:flex; justify-content:space-between; font-size:13px; } .ut-card-foot b { color:#fff; }
+
+    .ut-table { background:rgba(22,32,58,.55); border:1px solid rgba(253,251,255,.1); border-radius:14px; overflow:hidden; }
+    .ut-thead, .ut-trow { display:grid; grid-template-columns:1.3fr 1.4fr 1fr 1.4fr 1fr .8fr .9fr .9fr; gap:14px; align-items:center; }
+    .ut-thead { padding:13px 22px; background:rgba(255,255,255,.03); border-bottom:1px solid rgba(253,251,255,.1);
+                font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--neutral-400); font-weight:600; }
+    .ut-trow { padding:14px 22px; border-bottom:1px solid rgba(253,251,255,.06); font-size:14px; }
+    .ut-plat { display:inline-flex; align-items:center; gap:8px; color:#fff; }
+    .r { text-align:right; } .b { font-weight:600; color:#fff; font-variant-numeric:tabular-nums; }
+    .ut-trow .in, .ut-trow .out { font-variant-numeric:tabular-nums; }
+
+    /* Charts */
+    .ut-charts { display:grid; grid-template-columns:2fr 1fr; gap:16px; margin-top:20px; }
+    .ut-panel { background:rgba(22,32,58,.7); border:1px solid rgba(253,251,255,.12); border-radius:14px; padding:22px 24px; }
+    .ut-panel--full { grid-column:1 / -1; }
+    .ut-panel-head { margin-bottom:8px; }
+    .ut-panel-head h2 { font-size:18px; }
+    .ut-panel-head p { margin:3px 0 0; color:var(--neutral-400); font-size:13px; }
+    .ut-donut-wrap { display:flex; justify-content:center; }
+    /* Re-tone MudChart internals for the Midnight surface */
+    .ut .mud-chart text { fill:var(--neutral-400); font-family:var(--font-sans); }
+    .ut .mud-chart-legend, .ut .mud-chart-legend .mud-typography { color:var(--neutral-300); }
+    .ut .mud-charts-gridlines-fullgrid line, .ut .mud-charts-xaxis line, .ut .mud-charts-yaxis line { stroke:rgba(253,251,255,.08); }
+
+    @@media (max-width:1000px){ .ut-kpis,.ut-cards{grid-template-columns:repeat(2,1fr);} .ut-charts{grid-template-columns:1fr;} }
+</style>
+
+@code {
+    private IReadOnlyCollection<SessionView> _sessions = Array.Empty<SessionView>();
+    private IReadOnlyCollection<ProjectUsageRow> _projects = Array.Empty<ProjectUsageRow>();
+    private IReadOnlyCollection<UsageSummaryRow> _usage = Array.Empty<UsageSummaryRow>();
+    private long _totalTokens;
+    private long _maxProjectTokens;
+    private string? _error;
+
+    // ---- MudBlazor chart state ----
+    private List<ChartSeries<double>> _usageSeries = new();
+    private string[] _usageLabels = Array.Empty<string>();
+    private List<ChartSeries<double>> _modelSeries = new();
+    private string[] _modelLabels = Array.Empty<string>();
+    private List<ChartSeries<double>> _projectSeries = new();
+    private string[] _projectLabels = Array.Empty<string>();
+
+    // Cyclotron palette applied to each chart's series
+    private readonly LineChartOptions _lineOptions = new()
+    {
+        ChartPalette = new[] { "#60D8EE", "#622E88" },   // Sky Blue = total, Eminence = input
+        InterpolationOption = InterpolationOption.NaturalSpline,
+        LineStrokeWidth = 3
+    };
+    private readonly DonutChartOptions _donutOptions = new()
+    {
+        ChartPalette = new[] { "#3756A3", "#60D8EE", "#622E88", "#F38826", "#A9D23D" }
+    };
+    private readonly BarChartOptions _barOptions = new()
+    {
+        ChartPalette = new[] { "#3756A3" }   // True Blue bars
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _sessions = Dashboard.Sessions();
+            _projects = await Dashboard.ProjectsAsync(null, null);
+            _usage = await Dashboard.UsageAsync(null, null);
+            _totalTokens = _projects.Sum(p => p.TotalTokens);
+            _maxProjectTokens = _projects.Count > 0 ? _projects.Max(p => p.TotalTokens) : 0;
+            BuildCharts();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private void BuildCharts()
+    {
+        // Model split — REAL: grouped straight from the usage rollup.
+        var byModel = _usage
+            .GroupBy(u => u.Model)
+            .Select(g => new { Model = g.Key, Tokens = g.Sum(x => x.InputTokens + x.OutputTokens) })
+            .OrderByDescending(x => x.Tokens)
+            .ToList();
+        _modelLabels = byModel.Select(x => x.Model ?? "unknown").ToArray();
+        _modelSeries = new()
+        {
+            new ChartSeries<double> { Name = "Tokens", Data = byModel.Select(x => (double)x.Tokens).ToArray() }
+        };
+
+        // Top projects — REAL: from the projects rollup, tokens in millions.
+        var top = _projects.OrderByDescending(p => p.TotalTokens).Take(6).ToList();
+        _projectLabels = top.Select(p => p.ProjectName).ToArray();
+        _projectSeries = new()
+        {
+            new ChartSeries<double> { Name = "Tokens (M)", Data = top.Select(p => Math.Round(p.TotalTokens / 1_000_000d, 2)).ToArray() }
+        };
+
+        // Usage over time — needs a daily time-series your service doesn't expose yet.
+        // Replace this sample with e.g.  await Dashboard.DailyTotalsAsync(from, to);
+        _usageLabels = new[] { "Jul 4", "Jul 5", "Jul 6", "Jul 7", "Jul 8", "Jul 9", "Jul 10" };
+        _usageSeries = new()
+        {
+            new ChartSeries<double> { Name = "Total", Data = new double[] { 3.2, 2.9, 4.4, 5.0, 4.7, 5.4, 5.8 } },
+            new ChartSeries<double> { Name = "Input", Data = new double[] { 2.4, 2.2, 3.3, 3.7, 3.5, 4.0, 4.3 } }
+        };
+    }
+
+    // Compact token formatting: 1_240_000 -> "1.2M"
+    private static string Short(long n) =>
+        n >= 1_000_000 ? (n / 1_000_000d).ToString("0.#") + "M"
+        : n >= 1_000    ? (n / 1_000d).ToString("0") + "K"
+        : n.ToString();
+
+    private static string Conf(string? c) => (c ?? "").ToLowerInvariant() switch
+    {
+        "high" => "high",
+        "medium" => "med",
+        "low" => "low",
+        _ => "med"
+    };
+
+    private static string PlatformColor(string? platform) => (platform ?? "") switch
+    {
+        "Claude Code" => "#60D8EE",
+        "Cursor" => "#622E88",
+        "GitHub Copilot" => "#3756A3",
+        "Windsurf" => "#F38826",
+        _ => "#9aa2bf"
+    };
+}

@@ -1,0 +1,28 @@
+{
+  "//setup": "GitHub Copilot repo-level hooks. Copilot CLI + cloud agent load .github/hooks/*.json. Uses the 'http' hook type (POSTs the event JSON directly, no shell/curl needed) so the X-User-Email header can be attached via 'headers' + 'allowedEnvVars' without shell-syntax ambiguity across platforms. Requires COPILOT_HOOK_ALLOW_LOCALHOST=1 in the environment Copilot runs in (plain http is otherwise refused except to localhost/127.*/[::1] with that flag set), and a USER_EMAIL environment variable so events are attributed to you instead of landing as 'unknown'.",
+  "//localApi": "Start the Function App with ./scripts/run-functions.ps1 (or the Aspire AppHost). If the port differs, update the URL in every entry below.",
+  "version": 1,
+  "hooks": {
+    "SessionStart": [
+      { "type": "http", "url": "http://localhost:7071/api/hooks/copilot", "headers": { "X-User-Email": "$USER_EMAIL" }, "allowedEnvVars": ["USER_EMAIL"], "timeoutSec": 10 }
+    ],
+    "SessionEnd": [
+      { "type": "http", "url": "http://localhost:7071/api/hooks/copilot", "headers": { "X-User-Email": "$USER_EMAIL" }, "allowedEnvVars": ["USER_EMAIL"], "timeoutSec": 10 }
+    ],
+    "UserPromptSubmit": [
+      { "type": "http", "url": "http://localhost:7071/api/hooks/copilot", "headers": { "X-User-Email": "$USER_EMAIL" }, "allowedEnvVars": ["USER_EMAIL"], "timeoutSec": 10 }
+    ],
+    "PreToolUse": [
+      { "type": "http", "url": "http://localhost:7071/api/hooks/copilot", "headers": { "X-User-Email": "$USER_EMAIL" }, "allowedEnvVars": ["USER_EMAIL"], "timeoutSec": 10 }
+    ],
+    "PostToolUse": [
+      { "type": "http", "url": "http://localhost:7071/api/hooks/copilot", "headers": { "X-User-Email": "$USER_EMAIL" }, "allowedEnvVars": ["USER_EMAIL"], "timeoutSec": 10 }
+    ],
+    "Stop": [
+      { "type": "http", "url": "http://localhost:7071/api/hooks/copilot", "headers": { "X-User-Email": "$USER_EMAIL" }, "allowedEnvVars": ["USER_EMAIL"], "timeoutSec": 10 }
+    ],
+    "SubagentStop": [
+      { "type": "http", "url": "http://localhost:7071/api/hooks/copilot", "headers": { "X-User-Email": "$USER_EMAIL" }, "allowedEnvVars": ["USER_EMAIL"], "timeoutSec": 10 }
+    ]
+  }
+}
