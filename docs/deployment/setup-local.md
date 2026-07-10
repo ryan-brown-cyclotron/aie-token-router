@@ -81,7 +81,7 @@ Invoke-RestMethod `
   -Body $body
 ```
 
-The request body requires `projectKey` and `projectName`. It does not accept a user field; the app derives the user from token claims or development headers. Project context can also be set through the MCP project-context tools hosted inside `UsageTracker.Functions` (see [mcp-project-context.md](v2/mcp-project-context.md)).
+The request body requires `projectKey` and `projectName`. It does not accept a user field; the app derives the user from token claims or development headers. Project context can also be set through the MCP project-context tools hosted inside `UsageTracker.Functions` (see [mcp-project-context.md](../design/mcp-project-context.md)).
 
 ## Hook Config Samples
 

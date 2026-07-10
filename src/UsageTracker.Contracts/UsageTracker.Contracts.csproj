@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>UsageTracker.Contracts</RootNamespace>
+    <!-- Shared by the daemon (Worker host) and the CLI (single-file/trimmed). Keep it dependency-free
+         and use System.Text.Json source generation so the CLI can trim/AOT-publish cleanly. -->
+    <IsTrimmable>true</IsTrimmable>
+  </PropertyGroup>
+
+</Project>

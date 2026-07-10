@@ -6,7 +6,7 @@ namespace UsageTracker;
 /// <summary>
 /// Decides whether a hook's tool output is worth compressing and, if so, calls the registered
 /// <see cref="IToolOutputCompressor"/> and builds the platform-specific response. Scope (from
-/// docs/v2/library.md): compress only large PostToolUse tool outputs; never compress raw payloads,
+/// docs/design/library.md): compress only large PostToolUse tool outputs; never compress raw payloads,
 /// metadata, or small outputs. Always fail-open - including when no compressor is registered at
 /// all, in which case hooks just ingest and log normally with no compression attempted.
 /// </summary>
@@ -34,7 +34,7 @@ public sealed class ToolOutputCompressionService
             return null;
 
         var output = ExtractToolOutput(root);
-        if (string.IsNullOrEmpty(output) || output.Length < _options.MinimumCharacters)
+        if (string.IsNullOrEmpty(output))
             return null;
 
         return await _compressor.CompressAsync(output, model, cancellationToken);
@@ -43,7 +43,7 @@ public sealed class ToolOutputCompressionService
     /// <summary>
     /// Builds the observational hook response. Copilot documents a <c>modifiedResult</c> replacement
     /// field, so we return the compressed text there. Claude Code and Cursor stay observe-only until
-    /// their output-replacement hook contracts are validated (see docs/v2/headroom-sidecar.md).
+    /// their output-replacement hook contracts are validated (see docs/design/headroom-sidecar.md).
     /// </summary>
     public static object BuildResponse(string platform, ToolOutputCompression? compression)
     {

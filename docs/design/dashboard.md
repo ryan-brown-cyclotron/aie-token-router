@@ -42,7 +42,7 @@ and `func` run on different origins, so start the Functions app with CORS enable
 example `func start --cors "*"`.
 
 This is a different deployment target than `UsageTracker.Functions` itself, which
-targets Azure Container Apps when run standalone (see [hosting.md](hosting.md)). The
+targets Azure Container Apps when run standalone (see [hosting.md](../deployment/hosting.md)). The
 two are not mutually exclusive: Static Web Apps' "bring your own Functions API" model
 still requires a Functions app to point at, and Container Apps is one valid way to host
 that Functions app; the two docs describe complementary halves of the same deployment,

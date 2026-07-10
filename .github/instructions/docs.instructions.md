@@ -11,20 +11,26 @@ Documentation should be practical and implementation-oriented for this repositor
 
 ```
 docs/
-├── README.md                     # Documentation entry point
-├── architecture.md               # Current architecture and data flow
-├── hooks.md                      # Hook configuration for Claude Code and GitHub Copilot
-├── setup-local.md                # Local API, Aspire, and hook configuration
-├── deployment-container-app.md   # Container and Azure Container Apps notes
-└── v2/                           # Planned V2 restructure (Functions + Library + Dashboard)
-    ├── README.md                 # V2 overview and index
+├── README.md                     # Documentation entry point / index
+├── onboarding/                   # Adopt the tool (user-facing)
+│   ├── README.md                 # Getting started (install, init, setup)
+│   ├── hooks.md                  # Hook configuration for Claude Code and GitHub Copilot
+│   ├── claude-code.settings.json # Canonical Claude Code hook example
+│   └── copilot.hooks.json        # Canonical Copilot hook example
+├── deployment/                   # Run the service (operator-facing)
+│   ├── setup-local.md            # Local Functions host, Aspire, and hook configuration
+│   ├── container-app.md          # Container and Azure Container Apps notes + Easy Auth
+│   └── hosting.md                # Azure Container Apps + Functions hosting
+└── design/                       # How it works (architecture)
+    ├── README.md                 # Design overview and index
+    ├── architecture.md           # Retired V1 (UsageTracker.Api) historical notes
     ├── solution-structure.md     # Project tree, file movement, dependency rules
     ├── functions.md              # Function App HTTP boundary and endpoints
     ├── library.md                # Domain/Infrastructure/Runtime layering and DI
     ├── mcp-project-context.md    # MCP tools and project attribution model
     ├── dashboard.md              # Blazor dashboard read experience
-    ├── tool-output-compression.md # Compression extension point, scope, and default no-op behavior
-    ├── hosting.md                # Azure Container Apps + Functions hosting
+    ├── tool-output-compression.md # Compression extension point, scope, and default behavior
+    ├── daemon-cli.md             # Local daemon + thin CLI + Entra device auth
     └── roadmap.md                # Implementation phases and acceptance criteria
 ```
 

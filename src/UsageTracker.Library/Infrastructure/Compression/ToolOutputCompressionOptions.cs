@@ -8,7 +8,4 @@ namespace UsageTracker;
 public sealed class ToolOutputCompressionOptions
 {
     public const string SectionName = "ToolOutputCompression";
-
-    /// <summary>Outputs shorter than this are not worth a round-trip to a compressor.</summary>
-    public int MinimumCharacters { get; set; } = 2000;
 }

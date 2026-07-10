@@ -87,14 +87,14 @@ The AppHost uses stable Aspire packages: `Aspire.Hosting.Azure.CosmosDB` and
 stable, so `AddAzureFunctionsProject` is used for the Functions project rather than the
 generic `AddProject`. There is no compression sidecar in the app model; a host that
 wants compression registers its own `IToolOutputCompressor` in the Functions
-composition root (see [tool-output-compression.md](tool-output-compression.md)).
+composition root (see [tool-output-compression.md](../design/tool-output-compression.md)).
 
 ## Dashboard deploys separately
 
 This doc covers `UsageTracker.Functions` only. `UsageTracker.Dashboard` (the Blazor
 WebAssembly app) does not deploy onto Azure Container Apps alongside Functions — it
 targets Azure Static Web Apps with Functions as its API backend instead. See
-[dashboard.md](dashboard.md#hosting-note) for that deployment shape.
+[dashboard.md](../design/dashboard.md#hosting-note) for that deployment shape.
 
 ## References
 

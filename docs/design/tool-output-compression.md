@@ -17,8 +17,7 @@ in its own composition root.
   returns a `ToolOutputCompression`. Implementations should always fail open: on any
   error, return `ToolOutputCompression.Unchanged` with the original text.
 - `ToolOutputCompressionOptions` (bound from the `ToolOutputCompression` config
-  section) governs eligibility only — currently just `MinimumCharacters` (default
-  `2000`). There is no base URL or enabled flag; there is nothing to point at until a
+  section) is a placeholder for future configuration. There is no base URL or enabled flag; there is nothing to point at until a
   host registers a compressor.
 - `ToolOutputCompressionService` calls the registered compressor, if any. Its
   constructor takes `IToolOutputCompressor? compressor = null`; when nothing is

@@ -1,0 +1,168 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_VERSION: "8.0.x"
+  CLI_PROJECT: "src/UsageTracker.Cli/UsageTracker.Cli.csproj"
+  DAEMON_PROJECT: "src/UsageTracker.Daemon/UsageTracker.Daemon.csproj"
+
+jobs:
+  build:
+    name: Build ${{ matrix.rid }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            archive: zip
+            cli_name: usagetracker.exe
+            daemon_name: usagetracker-daemon.exe
+          - os: ubuntu-latest
+            rid: linux-x64
+            archive: tar.gz
+            cli_name: usagetracker
+            daemon_name: usagetracker-daemon
+          - os: macos-latest
+            rid: osx-x64
+            archive: tar.gz
+            cli_name: usagetracker
+            daemon_name: usagetracker-daemon
+          - os: macos-latest
+            rid: osx-arm64
+            archive: tar.gz
+            cli_name: usagetracker
+            daemon_name: usagetracker-daemon
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Publish CLI
+        run: >
+          dotnet publish ${{ env.CLI_PROJECT }}
+          --configuration Release
+          --runtime ${{ matrix.rid }}
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:PublishReadyToRun=true
+          -p:PublishTrimmed=false
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          --output ./dist/${{ matrix.rid }}/cli
+
+      - name: Publish daemon
+        run: >
+          dotnet publish ${{ env.DAEMON_PROJECT }}
+          --configuration Release
+          --runtime ${{ matrix.rid }}
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:PublishTrimmed=false
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          --output ./dist/${{ matrix.rid }}/daemon
+
+      - name: Create package folder
+        shell: bash
+        run: |
+          mkdir -p ./package/usagetracker/bin
+          cp "./dist/${{ matrix.rid }}/cli/${{ matrix.cli_name }}" ./package/usagetracker/bin/
+          cp "./dist/${{ matrix.rid }}/daemon/${{ matrix.daemon_name }}" ./package/usagetracker/bin/
+          cp README.md ./package/usagetracker/ 2>/dev/null || true
+          cp LICENSE ./package/usagetracker/ 2>/dev/null || true
+
+      - name: Add Unix install script
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cat > ./package/usagetracker/install.sh <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          INSTALL_DIR="${HOME}/.usagetracker/bin"
+          mkdir -p "$INSTALL_DIR"
+          cp ./bin/usagetracker "$INSTALL_DIR/usagetracker"
+          cp ./bin/usagetracker-daemon "$INSTALL_DIR/usagetracker-daemon"
+          chmod +x "$INSTALL_DIR/usagetracker" "$INSTALL_DIR/usagetracker-daemon"
+          echo "Installed to $INSTALL_DIR"
+          echo "Add to your shell profile if needed:"
+          echo "  export PATH=\"\$HOME/.usagetracker/bin:\$PATH\""
+          echo "Then run: usagetracker init --daemon-path \"$INSTALL_DIR/usagetracker-daemon\""
+          EOF
+          chmod +x ./package/usagetracker/install.sh
+
+      - name: Add Windows install script
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          @'
+          $InstallDir = "$env:USERPROFILE\.usagetracker\bin"
+          New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+          Copy-Item ".\bin\usagetracker.exe" "$InstallDir\usagetracker.exe" -Force
+          Copy-Item ".\bin\usagetracker-daemon.exe" "$InstallDir\usagetracker-daemon.exe" -Force
+          Write-Host "Installed to $InstallDir"
+          Write-Host "Add this directory to PATH if needed: $InstallDir"
+          Write-Host "Then run: usagetracker init --daemon-path `"$InstallDir\usagetracker-daemon.exe`""
+          '@ | Out-File -Encoding utf8 ./package/usagetracker/install.ps1
+
+      - name: Create zip archive
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: Compress-Archive -Path ./package/usagetracker -DestinationPath ./usagetracker-${{ matrix.rid }}.zip -Force
+
+      - name: Create tar.gz archive
+        if: matrix.archive == 'tar.gz'
+        shell: bash
+        run: tar -czf ./usagetracker-${{ matrix.rid }}.tar.gz -C ./package usagetracker
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: usagetracker-${{ matrix.rid }}
+          path: |
+            ./usagetracker-${{ matrix.rid }}.zip
+            ./usagetracker-${{ matrix.rid }}.tar.gz
+          if-no-files-found: ignore
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Flatten artifacts
+        run: |
+          mkdir -p ./release
+          find ./artifacts -type f \( -name "*.zip" -o -name "*.tar.gz" \) -exec cp {} ./release/ \;
+
+      - name: Generate checksums
+        run: |
+          cd ./release
+          sha256sum * > checksums.txt
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ./release/*
+          generate_release_notes: true

@@ -14,9 +14,9 @@ public class ToolOutputCompressionServiceTests
             Task.FromResult(new ToolOutputCompression(true, "compressed:" + toolOutput, toolOutput.Length, 1));
     }
 
-    private static ToolOutputCompressionService CreateService(int minimumCharacters = 10, bool withCompressor = true)
+    private static ToolOutputCompressionService CreateService(bool withCompressor = true)
     {
-        var options = Options.Create(new ToolOutputCompressionOptions { MinimumCharacters = minimumCharacters });
+        var options = Options.Create(new ToolOutputCompressionOptions());
         return new ToolOutputCompressionService(options, withCompressor ? new FakeCompressor() : null);
     }
 
@@ -32,22 +32,11 @@ public class ToolOutputCompressionServiceTests
     }
 
     [Fact]
-    public async Task Skips_outputs_below_the_minimum_size()
-    {
-        var service = CreateService(minimumCharacters: 1000);
-        var evt = HookEvent.FromJson("claude-code", Parse("{\"hook_event_name\":\"PostToolUse\"}"));
-
-        var result = await service.TryCompressAsync(evt, Parse("{\"output\":\"tiny\"}"), null);
-
-        Assert.Null(result);
-    }
-
-    [Fact]
     public async Task No_compressor_registered_means_no_compression_attempted()
     {
         // Mirrors production DI: no IToolOutputCompressor is registered by default, so the
         // parameter resolves to null and hooks just ingest/log with no compression attempted.
-        var service = CreateService(minimumCharacters: 1, withCompressor: false);
+        var service = CreateService(withCompressor: false);
         var evt = HookEvent.FromJson("claude-code", Parse("{\"hook_event_name\":\"PostToolUse\"}"));
 
         var result = await service.TryCompressAsync(evt, Parse("{\"output\":\"a very long output string\"}"), null);
@@ -60,7 +49,7 @@ public class ToolOutputCompressionServiceTests
     {
         // Real Claude Code tool_response values aren't always strings (e.g. Bash returns
         // {stdout, stderr}) - ExtractToolOutput must fall back to raw JSON text for those.
-        var service = CreateService(minimumCharacters: 10);
+        var service = CreateService();
         var evt = HookEvent.FromJson("claude-code", Parse("{\"hook_event_name\":\"PostToolUse\"}"));
 
         var result = await service.TryCompressAsync(

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>UsageTracker.Daemon</RootNamespace>
+    <AssemblyName>usagetracker-daemon</AssemblyName>
+    <!-- Resident host that owns MSAL/WAM interop + Kestrel. Publish single-file self-contained (not AOT;
+         WAM interop isn't AOT-clean). -->
+    <UserSecretsId>usagetracker-daemon</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Identity.Client" Version="4.66.2" />
+    <PackageReference Include="Microsoft.Identity.Client.Broker" Version="4.66.2" />
+    <PackageReference Include="Microsoft.Identity.Client.Extensions.Msal" Version="4.66.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\UsageTracker.Library\UsageTracker.Library.csproj" />
+    <ProjectReference Include="..\UsageTracker.Contracts\UsageTracker.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

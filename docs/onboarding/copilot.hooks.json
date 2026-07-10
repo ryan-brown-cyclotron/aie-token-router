@@ -1,0 +1,24 @@
+{
+  "//setup": "Save as .github/hooks/usage-tracking.json (repo/cloud agent - must be on the default branch) or ~/.copilot/hooks/usage-tracking.json (user-level, CLI). GitHub Copilot delivers each event as JSON on stdin, so these command hooks pipe it to the 'usagetracker' CLI - same path as Claude Code. Requires 'usagetracker' on PATH (run 'usagetracker init' first). Identity comes from the daemon's Entra token; no USER_EMAIL. Event names use Copilot's canonical camelCase; PascalCase aliases (SessionStart, PreToolUse, ...) also work for VS Code compatibility.",
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      { "type": "command", "bash": "usagetracker command copilot --stdin", "powershell": "usagetracker command copilot --stdin", "timeoutSec": 10 }
+    ],
+    "sessionEnd": [
+      { "type": "command", "bash": "usagetracker command copilot --stdin", "powershell": "usagetracker command copilot --stdin", "timeoutSec": 10 }
+    ],
+    "userPromptSubmitted": [
+      { "type": "command", "bash": "usagetracker command copilot --stdin", "powershell": "usagetracker command copilot --stdin", "timeoutSec": 10 }
+    ],
+    "preToolUse": [
+      { "type": "command", "bash": "usagetracker command copilot --stdin", "powershell": "usagetracker command copilot --stdin", "timeoutSec": 10 }
+    ],
+    "postToolUse": [
+      { "type": "command", "bash": "usagetracker command copilot --stdin", "powershell": "usagetracker command copilot --stdin", "timeoutSec": 10 }
+    ],
+    "errorOccurred": [
+      { "type": "command", "bash": "usagetracker command copilot --stdin", "powershell": "usagetracker command copilot --stdin", "timeoutSec": 10 }
+    ]
+  }
+}

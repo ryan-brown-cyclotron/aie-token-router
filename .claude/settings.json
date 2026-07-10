@@ -1,28 +1,13 @@
 {
+  "//": "This repo's own hooks target the locally-built CLI directly (no global 'usagetracker' install needed - just `dotnet build`). The CLI fails open if the daemon isn't running. End users should instead use the PATH-based examples in docs/onboarding/. Requires the Debug build of UsageTracker.Cli; run `dotnet build src/UsageTracker.sln` first.",
   "hooks": {
     "SessionStart": [
       {
         "matcher": ".*",
         "hooks": [
           {
-            "type": "http",
-            "url": "http://localhost:7071/api/hooks/claude-code",
-            "headers": { "X-User-Email": "$USER_EMAIL" },
-            "allowedEnvVars": ["USER_EMAIL"],
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": ".*",
-        "hooks": [
-          {
-            "type": "http",
-            "url": "http://localhost:7071/api/hooks/claude-code",
-            "headers": { "X-User-Email": "$USER_EMAIL" },
-            "allowedEnvVars": ["USER_EMAIL"],
+            "type": "command",
+            "command": "dotnet \"$CLAUDE_PROJECT_DIR/src/UsageTracker.Cli/bin/Debug/net8.0/usagetracker.dll\" command claude-code --stdin",
             "timeout": 10
           }
         ]
@@ -33,10 +18,20 @@
         "matcher": ".*",
         "hooks": [
           {
-            "type": "http",
-            "url": "http://localhost:7071/api/hooks/claude-code",
-            "headers": { "X-User-Email": "$USER_EMAIL" },
-            "allowedEnvVars": ["USER_EMAIL"],
+            "type": "command",
+            "command": "dotnet \"$CLAUDE_PROJECT_DIR/src/UsageTracker.Cli/bin/Debug/net8.0/usagetracker.dll\" command claude-code --stdin",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "dotnet \"$CLAUDE_PROJECT_DIR/src/UsageTracker.Cli/bin/Debug/net8.0/usagetracker.dll\" command claude-code --stdin",
             "timeout": 10
           }
         ]
@@ -47,10 +42,8 @@
         "matcher": ".*",
         "hooks": [
           {
-            "type": "http",
-            "url": "http://localhost:7071/api/hooks/claude-code",
-            "headers": { "X-User-Email": "$USER_EMAIL" },
-            "allowedEnvVars": ["USER_EMAIL"],
+            "type": "command",
+            "command": "dotnet \"$CLAUDE_PROJECT_DIR/src/UsageTracker.Cli/bin/Debug/net8.0/usagetracker.dll\" command claude-code --stdin",
             "timeout": 10
           }
         ]
@@ -61,10 +54,8 @@
         "matcher": ".*",
         "hooks": [
           {
-            "type": "http",
-            "url": "http://localhost:7071/api/hooks/claude-code",
-            "headers": { "X-User-Email": "$USER_EMAIL" },
-            "allowedEnvVars": ["USER_EMAIL"],
+            "type": "command",
+            "command": "dotnet \"$CLAUDE_PROJECT_DIR/src/UsageTracker.Cli/bin/Debug/net8.0/usagetracker.dll\" command claude-code --stdin",
             "timeout": 10
           }
         ]
