@@ -13,11 +13,10 @@ namespace UsageTracker.Tests;
 /// <summary>
 /// Same continuity story as <see cref="SessionContinuityTests"/>, but driven by the real
 /// <see cref="FunctionsUserContext"/> instead of a fake, under the assumptions this system
-/// actually runs under: hook traffic always carries the caller's identity via the X-User-Email
-/// header (see hook config migration), and project-context-setting calls are also identified -
-/// today via the same header path when they arrive over HTTP, but once the MCP transport gets
-/// real auth, via token claims instead. Proves both identity paths resolve to the same UserKey and
-/// the continuity/backfill logic doesn't care which one produced it.
+/// actually runs under: hook traffic carries the caller's verified identity via the Container Apps
+/// Easy Auth principal header (the daemon presents an Entra token; Easy Auth injects the principal),
+/// and project-context-setting calls are identified via token claims. Proves both identity paths
+/// resolve to the same UserKey and the continuity/backfill logic doesn't care which one produced it.
 /// </summary>
 public class SessionContinuityRealIdentityTests
 {
@@ -56,9 +55,9 @@ public class SessionContinuityRealIdentityTests
         const string sessionId = "session-real-identity-1";
         const string userEmail = "user@example.com";
 
-        // Hook traffic arrives with the caller identified only via the X-User-Email header - the
-        // mechanism every hook config (.claude/settings.json, copilot.hooks.json, etc.) now uses.
-        holder.Current = HttpContextWithHeader(userEmail);
+        // Hook traffic arrives with the caller identified via the Easy Auth principal - the verified
+        // mechanism every hook now uses through the daemon (see docs/design/daemon-cli.md).
+        holder.Current = HttpContextWithEasyAuth(userEmail);
         await hooks.IngestAsync("claude-code", Payload(sessionId, "PreToolUse", 10, 0));
         await hooks.IngestAsync("claude-code", Payload(sessionId, "PostToolUse", 20, 5));
 
@@ -73,11 +72,11 @@ public class SessionContinuityRealIdentityTests
         Assert.False(setResult.Unauthorized);
         Assert.Equal(userEmail, setResult.Window!.User);
 
-        // More hook traffic, again identified via the header, continues on the same session.
-        holder.Current = HttpContextWithHeader(userEmail);
+        // More hook traffic, again identified via Easy Auth, continues on the same session.
+        holder.Current = HttpContextWithEasyAuth(userEmail);
         await hooks.IngestAsync("claude-code", Payload(sessionId, "PostToolUse", 30, 10));
 
-        // Both the header-identified and claims-identified calls resolved to the same UserKey, so
+        // Both the Easy-Auth-identified and claims-identified calls resolved to the same UserKey, so
         // the whole window - backfilled and live-attributed alike - lands under one project.
         var projects = await dashboard.ProjectsAsync(null, null);
         var projectRow = Assert.Single(projects, p => p.ProjectKey == "proj");
@@ -87,10 +86,11 @@ public class SessionContinuityRealIdentityTests
         Assert.DoesNotContain(usage, row => row.ProjectKey == "unknown");
     }
 
-    private static HttpContext HttpContextWithHeader(string email)
+    private static HttpContext HttpContextWithEasyAuth(string email)
     {
+        var json = $"{{\"auth_typ\":\"aad\",\"claims\":[{{\"typ\":\"preferred_username\",\"val\":\"{email}\"}}]}}";
         var httpContext = new DefaultHttpContext();
-        httpContext.Request.Headers["X-User-Email"] = email;
+        httpContext.Request.Headers["X-MS-CLIENT-PRINCIPAL"] = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(json));
         return httpContext;
     }
 

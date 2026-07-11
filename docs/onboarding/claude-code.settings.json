@@ -1,0 +1,35 @@
+{
+  "//": "Merge this 'hooks' block into ~/.claude/settings.json (all projects) or .claude/settings.json (this project only). Hooks now invoke the local 'usagetracker' CLI, which forwards to the resident daemon; the daemon attaches a verified Entra user token when calling the backend, so no X-User-Email / USER_EMAIL is needed. Run 'usagetracker init' once to install the CLI on PATH, register the daemon, and configure the remote. Identity comes from the enrolled device via the daemon, not from this file.",
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [ { "type": "command", "command": "usagetracker command claude-code --stdin", "timeout": 10 } ] }
+    ],
+    "SessionEnd": [
+      { "hooks": [ { "type": "command", "command": "usagetracker command claude-code --stdin", "timeout": 10 } ] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [ { "type": "command", "command": "usagetracker command claude-code --stdin", "timeout": 10 } ] }
+    ],
+    "PreToolUse": [
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "usagetracker command claude-code --stdin", "timeout": 10 } ] }
+    ],
+    "PostToolUse": [
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "usagetracker command claude-code --stdin", "timeout": 10 } ] }
+    ],
+    "PostToolUseFailure": [
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "usagetracker command claude-code --stdin", "timeout": 10 } ] }
+    ],
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": "usagetracker command claude-code --stdin", "timeout": 10 } ] }
+    ],
+    "SubagentStart": [
+      { "hooks": [ { "type": "command", "command": "usagetracker command claude-code --stdin", "timeout": 10 } ] }
+    ],
+    "SubagentStop": [
+      { "hooks": [ { "type": "command", "command": "usagetracker command claude-code --stdin", "timeout": 10 } ] }
+    ],
+    "PreCompact": [
+      { "hooks": [ { "type": "command", "command": "usagetracker command claude-code --stdin", "timeout": 10 } ] }
+    ]
+  }
+}

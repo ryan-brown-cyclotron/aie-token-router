@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>UsageTracker.Cli</RootNamespace>
+    <AssemblyName>usagetracker</AssemblyName>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- The CLI is spawned per hook; keep startup fast. Publish single-file, self-contained, ReadyToRun
+         (see docs/design/daemon-cli.md for the exact publish command). -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\UsageTracker.Contracts\UsageTracker.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

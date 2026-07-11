@@ -80,7 +80,7 @@ UsageTracker.AppHost     -> UsageTracker.Functions (AddAzureFunctionsProject)
 - [MCP project context](mcp-project-context.md) — MCP tools plus the attribution model.
 - [Blazor dashboard](dashboard.md) — pages and read endpoints.
 - [Tool output compression](tool-output-compression.md) — compression extension point, scope, and default no-op behavior.
-- [Hosting](hosting.md) — Azure Container Apps + Functions hosting.
+- [Hosting](../deployment/hosting.md) — Azure Container Apps + Functions hosting.
 - [Roadmap](roadmap.md) — implementation phases and acceptance criteria.
 
 ## Final design statement

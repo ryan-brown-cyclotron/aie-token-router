@@ -1,41 +1,35 @@
 # UsageTracker Documentation
 
-UsageTracker is a local-first hook receiver for observing coding-agent activity from tools such as Claude Code and GitHub Copilot. It receives hook payloads, normalizes key fields, reads token usage from transcript files when available, and exposes summary endpoints for inspection.
+UsageTracker observes coding-agent activity (Claude Code, GitHub Copilot, Cursor) via hooks. Agents fire
+hooks into the local `usagetracker` daemon, which attaches a verified Entra identity, compacts large tool
+output, and forwards to a backend that normalizes usage, attributes it to projects, and serves a dashboard.
 
-## Contents
+The docs are organized into three areas:
 
-- [Architecture](architecture.md)
-- [Hook configuration](hooks.md)
-- [V2 architecture restructure](v2/README.md)
-- [Local setup](setup-local.md)
-- [Container Apps deployment](deployment-container-app.md)
+## [onboarding/](onboarding/) — adopt the tool
 
-## Current Scope
+Start here if you want to point your agent at UsageTracker.
 
-Implemented now (the V2 structure — see [V2 architecture restructure](v2/README.md)):
+- [Getting started](onboarding/README.md) — install the CLI, run `usagetracker init`, wire your hooks.
+- [Hook configuration](onboarding/hooks.md) — the hook model and per-agent settings.
+- [claude-code.settings.json](onboarding/claude-code.settings.json) / [copilot.hooks.json](onboarding/copilot.hooks.json) — copy-paste examples.
 
-- `UsageTracker.Functions` (Azure Functions isolated worker) hosts hook ingestion,
-  project context, dashboard read, and health endpoints under `/api`, plus the four MCP
-  project-context tools as native Azure Functions MCP tool triggers (remote/SSE
-  transport).
-- `UsageTracker.Library` owns all domain, infrastructure, and runtime behavior.
-- `UsageTracker.Dashboard` (Blazor WebAssembly) reads the dashboard endpoints.
-- Hook ingestion for Claude Code, GitHub Copilot, and Cursor routes.
-- Project context attribution and MCP context tools.
-- In-memory session tracking plus Cosmos-backed persistence via `IUsageRepository`.
-- Transcript JSONL token extraction.
-- Optional tool-output compression extension point (`IToolOutputCompressor`) for
-  model-bound post-tool output; no implementation ships by default, so hooks ingest
-  and log with no compression unless a host registers one (Copilot in-path when
-  registered; Claude Code and Cursor observe-only).
-- Aspire AppHost (Functions + Cosmos + Dashboard) and ServiceDefaults.
-- Focused unit tests for normalization, token reading, and summary grouping.
+## [deployment/](deployment/) — run the service
 
-Follow-ups (see [roadmap.md](v2/roadmap.md) → Remaining / follow-ups):
+For whoever stands up the backend and local environment.
 
-- Claude Code and Cursor in-path output replacement, pending validation.
-- Durable, scale-out-safe session store.
-- Authentication and multi-tenant authorization.
+- [Local setup](deployment/setup-local.md) — Functions host, Aspire, local hook config.
+- [Container Apps deployment](deployment/container-app.md) — containerize, deploy, and enable Easy Auth.
+- [Hosting](deployment/hosting.md) — Azure Container Apps + Functions hosting model.
 
-The former `UsageTracker.Api` ASP.NET Core project has been deleted; the notes in
-[architecture.md](architecture.md) describe that retired V1 path.
+## [design/](design/) — how it works
+
+Architecture and component design.
+
+- [Design overview](design/README.md) — the current architecture and index.
+- [Daemon + CLI](design/daemon-cli.md) — local daemon, thin CLI, and Entra device auth.
+- [Solution structure](design/solution-structure.md), [Library](design/library.md), [Functions](design/functions.md), [Dashboard](design/dashboard.md), [MCP project context](design/mcp-project-context.md), [Tool-output compression](design/tool-output-compression.md).
+- [Roadmap](design/roadmap.md) — implementation phases and follow-ups.
+- [Architecture (retired V1 notes)](design/architecture.md) — historical context for the deleted `UsageTracker.Api`.
+
+> `src/` is authoritative. Where a doc's endpoint, type name, or sample no longer matches the code, trust the code.

@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
@@ -7,17 +9,19 @@ namespace UsageTracker.Functions;
 
 /// <summary>
 /// Isolated-worker port of the former ASP.NET <c>HttpUserContext</c>. Identity precedence:
-/// (1) token claims, (2) the <c>X-User-Email</c> header - trusted in <em>all</em> environments,
-/// since hook-originated requests (Claude Code, GitHub Copilot) have no other identity mechanism
-/// and this is an internal tool, not a security boundary - (3) <c>X-Dev-User-*</c> headers, kept
-/// Development-only for existing local dev-testing workflows, (4) the MCP no-HttpContext fallback
-/// below. Uses <see cref="IHostEnvironment"/> instead of <c>IWebHostEnvironment</c> and the
-/// HttpContext surfaced by the Functions ASP.NET Core integration.
+/// (1) the Azure Container Apps <em>Easy Auth</em> principal (<c>X-MS-CLIENT-PRINCIPAL*</c> headers),
+/// which is the verified caller identity in production once built-in authentication is enabled;
+/// (2) token claims on <c>HttpContext.User</c> (populated only if in-worker JWT validation is ever
+/// added); (3) the <c>X-User-Email</c> header - <em>Development only</em>, since the local daemon now
+/// supplies a real Entra token in production and this unauthenticated header must not be trusted there;
+/// (4) <c>X-Dev-User-*</c> headers (Development only); (5) the no-HttpContext fallback below.
+/// Uses <see cref="IHostEnvironment"/> and the HttpContext surfaced by the Functions ASP.NET Core
+/// integration.
 ///
-/// MCP tool trigger invocations carry no HttpContext - <c>ToolInvocationContext</c> exposes only
-/// the tool name and arguments, so there are no headers to read at all. For that path, Development
-/// falls back to a single configured local identity (Mcp:DefaultUser*), the same role the old
-/// stdio MCP server's UsageTracker:UserEmail setting played.
+/// Non-HTTP invocations (e.g. timer/health triggers) carry no HttpContext and thus no headers. For
+/// that path, Development falls back to a single configured local identity (Mcp:DefaultUser*). The
+/// project-context MCP tools no longer live here - they moved to the local daemon's loopback MCP
+/// endpoint, which supplies the real Entra (or dev OS) identity via DaemonUserContext.
 /// </summary>
 public sealed class FunctionsUserContext : IUserContext
 {
@@ -38,13 +42,89 @@ public sealed class FunctionsUserContext : IUserContext
         if (httpContext is null)
             return _environment.IsDevelopment() ? TryGetConfiguredDevelopmentUser() : null;
 
+        // Production identity: the Container Apps Easy Auth principal, injected by the platform after it
+        // validates the daemon's Entra Bearer token. This is the only trusted identity in production.
+        var easyAuthUser = TryGetEasyAuthUser(httpContext.Request.Headers);
+        if (easyAuthUser is not null) return easyAuthUser;
+
         var tokenUser = TryGetTokenUser(httpContext.User);
         if (tokenUser is not null) return tokenUser;
 
+        if (!_environment.IsDevelopment())
+            return null;
+
+        // Development-only fallbacks. X-User-Email was previously trusted everywhere; it is no longer,
+        // because the daemon now carries a verified identity and unauthenticated headers must not be
+        // trusted in production.
         var headerUser = TryGetUserEmailHeaderUser(httpContext.Request.Headers);
         if (headerUser is not null) return headerUser;
 
-        return _environment.IsDevelopment() ? TryGetDevelopmentHeaderUser(httpContext.Request.Headers) : null;
+        return TryGetDevelopmentHeaderUser(httpContext.Request.Headers);
+    }
+
+    /// <summary>
+    /// Reads the Azure App Service / Container Apps Easy Auth principal. Prefers the base64 JSON
+    /// <c>X-MS-CLIENT-PRINCIPAL</c> header (full claim set) and falls back to the flattened
+    /// <c>X-MS-CLIENT-PRINCIPAL-ID</c> / <c>-NAME</c> headers.
+    /// </summary>
+    private static CurrentUser? TryGetEasyAuthUser(IHeaderDictionary headers)
+    {
+        var (oid, upn, name) = TryReadPrincipalClaims(FirstHeader(headers, "X-MS-CLIENT-PRINCIPAL"));
+
+        oid ??= FirstHeader(headers, "X-MS-CLIENT-PRINCIPAL-ID");
+        upn ??= FirstHeader(headers, "X-MS-CLIENT-PRINCIPAL-NAME");
+        name ??= upn ?? oid;
+
+        return string.IsNullOrWhiteSpace(oid) && string.IsNullOrWhiteSpace(upn)
+            ? null
+            : new CurrentUser(oid ?? upn!, name ?? "unknown", upn ?? string.Empty);
+    }
+
+    private static (string? Oid, string? Upn, string? Name) TryReadPrincipalClaims(string? encodedPrincipal)
+    {
+        if (string.IsNullOrWhiteSpace(encodedPrincipal))
+            return (null, null, null);
+
+        try
+        {
+            var json = Encoding.UTF8.GetString(Convert.FromBase64String(encodedPrincipal));
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("claims", out var claims) || claims.ValueKind != JsonValueKind.Array)
+                return (null, null, null);
+
+            string? oid = null, upn = null, name = null;
+            foreach (var claim in claims.EnumerateArray())
+            {
+                var type = claim.TryGetProperty("typ", out var t) ? t.GetString() : null;
+                var value = claim.TryGetProperty("val", out var v) ? v.GetString() : null;
+                if (string.IsNullOrWhiteSpace(type) || string.IsNullOrWhiteSpace(value))
+                    continue;
+
+                switch (type)
+                {
+                    case "oid":
+                    case "http://schemas.microsoft.com/identity/claims/objectidentifier":
+                        oid ??= value;
+                        break;
+                    case "preferred_username":
+                    case "upn":
+                    case ClaimTypes.Upn:
+                    case ClaimTypes.Email:
+                        upn ??= value;
+                        break;
+                    case "name":
+                    case ClaimTypes.Name:
+                        name ??= value;
+                        break;
+                }
+            }
+
+            return (oid, upn, name);
+        }
+        catch (Exception ex) when (ex is FormatException or JsonException)
+        {
+            return (null, null, null);
+        }
     }
 
     private CurrentUser? TryGetConfiguredDevelopmentUser()

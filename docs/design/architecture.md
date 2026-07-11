@@ -4,8 +4,8 @@
 > has been **deleted**. The implemented architecture is now an Azure Functions boundary
 > (`UsageTracker.Functions`) over a reusable `UsageTracker.Library`, with a Blazor
 > dashboard and MCP project-context tools hosted inside the Functions app. See
-> [v2/README.md](v2/README.md) and the topic docs under
-> [v2/](v2/). The routes and hosting notes below no longer match `src/`; they are kept
+> [the design overview](README.md) and the other topic docs in this folder.
+> The routes and hosting notes below no longer match `src/`; they are kept
 > as historical context for how the concepts (normalization, token accounting, storage,
 > dev auth) map into the current library. Where they still apply, the V2 equivalents are
 > noted inline.
@@ -83,5 +83,5 @@ reusable `UsageTracker.Library`, with a Blazor dashboard (`UsageTracker.Dashboar
 project-context tools hosted directly inside `UsageTracker.Functions` (native Azure
 Functions MCP tool triggers over remote/SSE transport), and an optional tool-output
 compression extension point (`IToolOutputCompressor`) with no implementation shipped by
-default. `UsageTracker.Api` no longer exists. See [v2/README.md](v2/README.md) for the
+default. `UsageTracker.Api` no longer exists. See [the design overview](README.md) for the
 current design.

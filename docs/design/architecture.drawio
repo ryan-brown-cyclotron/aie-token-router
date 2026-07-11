@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" type="device">
+  <diagram name="Daemon + CLI Architecture" id="agent-obs-2">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ===== BOUNDARY: CODING AGENT ===== -->
+        <mxCell id="b-agent" value="CODING AGENT   ·   observed, not deployed" style="rounded=1;dashed=1;fillColor=none;strokeColor=#7E8C90;fontFamily=Segoe UI Semibold;fontSize=13;fontColor=#48585F;verticalAlign=top;align=left;spacingTop=8;spacingLeft=12;dashPattern=8 6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="560" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="n-agent" value="&lt;b&gt;Claude Code · GitHub Copilot · Cursor&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#48585F&quot;&gt;Fires lifecycle hooks (PreToolUse, PostToolUse, …)&lt;br&gt;Event JSON delivered on the hook command's stdin&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF3F7;strokeColor=#3756A3;fontFamily=Segoe UI;fontSize=12;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="70" y="86" width="500" height="66" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== BOUNDARY: MICROSOFT ENTRA ID ===== -->
+        <mxCell id="b-entra" value="MICROSOFT ENTRA ID   ·   identity provider" style="rounded=1;dashed=1;fillColor=none;strokeColor=#2E7D32;fontFamily=Segoe UI Semibold;fontSize=13;fontColor=#2E7D32;verticalAlign=top;align=left;spacingTop=8;spacingLeft=12;dashPattern=8 6;" vertex="1" parent="1">
+          <mxGeometry x="660" y="40" width="469" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="n-entra" value="&lt;b&gt;Entra ID&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#48585F&quot;&gt;Issues a user access token to the daemon via the&lt;br&gt;enrolled/Entra-joined device (WAM broker · silent SSO)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1F5E8;strokeColor=#2E7D32;fontFamily=Segoe UI;fontSize=12;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="690" y="86" width="410" height="66" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== BOUNDARY: DEVELOPER WORKSTATION ===== -->
+        <mxCell id="b-workstation" value="DEVELOPER WORKSTATION (Entra-joined device)   ·   deployed · local control plane" style="rounded=1;dashed=1;fillColor=none;strokeColor=#3756A3;fontFamily=Segoe UI Semibold;fontSize=13;fontColor=#3756A3;verticalAlign=top;align=left;spacingTop=8;spacingLeft=12;dashPattern=8 6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="210" width="560" height="500" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="n-cli" value="&lt;b&gt;usagetracker CLI&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#48585F&quot;&gt;Thin, per-invocation. `command &amp;lt;platform&amp;gt; --stdin`.&lt;br&gt;Auto-starts the daemon; &lt;b&gt;fails open&lt;/b&gt; (never blocks the agent)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8F0;strokeColor=#3756A3;fontFamily=Segoe UI;fontSize=12;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="80" y="264" width="480" height="70" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="n-daemon" value="&lt;b&gt;UsageTracker daemon&lt;/b&gt;&amp;nbsp;&lt;font color=&quot;#2E7D32&quot;&gt;[resident]&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#48585F&quot;&gt;Local control plane — Kestrel over named pipe / Unix socket:&lt;br&gt;• acquires &amp;amp; refreshes the Entra user token (WAM broker)&lt;br&gt;• reads local transcript files for real token counts&lt;br&gt;• compacts large tool output (modifiedResult)&lt;br&gt;• stamps verified identity, routes to the backend&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8F0;strokeColor=#3756A3;strokeWidth=2.5;fontFamily=Segoe UI;fontSize=12;verticalAlign=middle;align=left;spacingLeft=12;" vertex="1" parent="1">
+          <mxGeometry x="80" y="378" width="480" height="140" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="n-mcp" value="&lt;b&gt;Local MCP&lt;/b&gt;&amp;nbsp;&lt;font color=&quot;#7E8C90&quot;&gt;[optional]&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#48585F&quot;&gt;Project-context tools&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EEF3F7;strokeColor=#3756A3;dashed=1;dashPattern=6 4;fontFamily=Segoe UI;fontSize=12;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="80" y="560" width="230" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="n-secrets" value="&lt;b&gt;Local trust boundary&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#48585F&quot;&gt;per-user pipe/socket ACL&lt;br&gt;+ X-Local-Token&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C2C8C0;fontFamily=Segoe UI;fontSize=11;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="330" y="560" width="230" height="70" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== BOUNDARY: AZURE (HOSTED) ===== -->
+        <mxCell id="b-azure" value="AZURE   ·   hosted service we run" style="rounded=1;dashed=1;fillColor=none;strokeColor=#622E88;fontFamily=Segoe UI Semibold;fontSize=13;fontColor=#622E88;verticalAlign=top;align=left;spacingTop=8;spacingLeft=12;dashPattern=8 6;" vertex="1" parent="1">
+          <mxGeometry x="660" y="210" width="469" height="560" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="n-easyauth" value="&lt;b&gt;Container App · Easy Auth&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#48585F&quot;&gt;Validates the Bearer token; injects the verified&lt;br&gt;principal (X-MS-CLIENT-PRINCIPAL). 401 if unauthenticated&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8D5F0;strokeColor=#622E88;strokeWidth=2;fontFamily=Segoe UI;fontSize=12;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="690" y="264" width="410" height="70" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="n-functions" value="&lt;b&gt;UsageTracker.Functions&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#48585F&quot;&gt;Ingest → normalize → attribute to project/user.&lt;br&gt;Reads the principal from FunctionsUserContext. Hosts MCP.&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8D5F0;strokeColor=#622E88;strokeWidth=2;fontFamily=Segoe UI;fontSize=12;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="690" y="368" width="410" height="72" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="n-cosmos" value="&lt;b&gt;Cosmos DB&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#48585F&quot;&gt;Durable usage store&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8D5F0;strokeColor=#622E88;fontFamily=Segoe UI;fontSize=12;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="690" y="474" width="195" height="66" as="geometry"/>
+        </mxCell>
+        <mxCell id="n-dashboard" value="&lt;b&gt;Dashboard&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#48585F&quot;&gt;Usage by user · project · model&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8D5F0;strokeColor=#622E88;fontFamily=Segoe UI;fontSize=12;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="905" y="474" width="195" height="66" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== PAYLOAD NOTE ===== -->
+        <mxCell id="n-note" value="&lt;b&gt;Event accretes context&lt;/b&gt;&lt;br&gt;model + tokens&amp;nbsp;&amp;nbsp;@ agent / transcript&lt;br&gt;session_id&amp;nbsp;&amp;nbsp;@ agent&lt;br&gt;project_id&amp;nbsp;&amp;nbsp;@ attribution / MCP&lt;br&gt;&lt;b&gt;verified user&lt;/b&gt;&amp;nbsp;&amp;nbsp;@ daemon (Entra token)" style="shape=note;whiteSpace=wrap;html=1;fillColor=#FFF9E6;strokeColor=#E65100;fontFamily=Segoe UI;fontSize=10;align=left;spacingLeft=8;verticalAlign=middle;size=14;" vertex="1" parent="1">
+          <mxGeometry x="690" y="580" width="410" height="120" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== LEGEND ===== -->
+        <mxCell id="l-box" value="LEGEND" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C2C8C0;fontFamily=Segoe UI Semibold;fontSize=11;fontColor=#48585F;verticalAlign=top;align=left;spacingTop=6;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="40" y="726" width="560" height="74" as="geometry"/>
+        </mxCell>
+        <mxCell id="l-1" value="&lt;font color=&quot;#48585F&quot;&gt;Blue = local component&amp;nbsp;&amp;nbsp;·&amp;nbsp;&amp;nbsp;Purple = hosted service we run&amp;nbsp;&amp;nbsp;·&amp;nbsp;&amp;nbsp;Green = identity provider&lt;/font&gt;" style="text;html=1;align=left;fontFamily=Segoe UI;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="56" y="750" width="540" height="18" as="geometry"/>
+        </mxCell>
+        <mxCell id="l-2" value="&lt;font color=&quot;#48585F&quot;&gt;Solid = required path&amp;nbsp;&amp;nbsp;·&amp;nbsp;&amp;nbsp;Dashed = optional&amp;nbsp;&amp;nbsp;·&amp;nbsp;&amp;nbsp;Dashed boundary = trust / deployment zone&lt;/font&gt;" style="text;html=1;align=left;fontFamily=Segoe UI;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="56" y="772" width="540" height="18" as="geometry"/>
+        </mxCell>
+
+        <!-- ===== EDGES ===== -->
+        <mxCell id="e-agent-cli" value="hook event · JSON on stdin" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#3756A3;strokeWidth=2;fontFamily=Segoe UI;fontSize=10;fontColor=#3756A3;endArrow=block;endFill=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n-agent" target="n-cli">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e-cli-daemon" value="named pipe / Unix socket   (+ X-Local-Token)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#3756A3;strokeWidth=2.5;fontFamily=Segoe UI;fontSize=10;fontColor=#3756A3;endArrow=block;endFill=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n-cli" target="n-daemon">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e-daemon-entra" value="AcquireTokenSilent (WAM)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;dashPattern=6 4;strokeColor=#2E7D32;strokeWidth=2;fontFamily=Segoe UI;fontSize=10;fontColor=#2E7D32;endArrow=block;endFill=1;startArrow=none;exitX=1;exitY=0.2;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="n-daemon" target="n-entra">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e-daemon-backend" value="HTTPS + Bearer (Entra user token)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#622E88;strokeWidth=2.5;fontFamily=Segoe UI;fontSize=10;fontColor=#622E88;endArrow=block;endFill=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="n-daemon" target="n-easyauth">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e-easyauth-func" value="verified principal" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#622E88;strokeWidth=2;fontFamily=Segoe UI;fontSize=10;fontColor=#622E88;endArrow=block;endFill=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n-easyauth" target="n-functions">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e-func-cosmos" value="persist" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#622E88;fontFamily=Segoe UI;fontSize=10;fontColor=#622E88;endArrow=block;endFill=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n-functions" target="n-cosmos">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e-func-dash" value="read API" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#622E88;fontFamily=Segoe UI;fontSize=10;fontColor=#622E88;endArrow=block;endFill=1;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n-functions" target="n-dashboard">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e-mcp-daemon" value="project context" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;dashPattern=6 4;strokeColor=#3756A3;fontFamily=Segoe UI;fontSize=10;fontColor=#48585F;endArrow=block;endFill=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.25;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="n-mcp" target="n-daemon">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

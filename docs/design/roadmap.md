@@ -40,14 +40,11 @@
 
 1. `IToolOutputCompressor` added as a pure extension point interface; no
    implementation ships in the repo.
-2. `ToolOutputCompressionOptions` (`ToolOutputCompression:MinimumCharacters`) added for
-   eligibility gating.
-3. `ToolOutputCompressionService` takes an optional `IToolOutputCompressor`; nothing is
+2. `ToolOutputCompressionService` takes an optional `IToolOutputCompressor`; nothing is
    registered by default.
-4. Compresses only large model-bound tool outputs (>= `MinimumCharacters`) when a host
-   registers a compressor.
-5. Raw event stored before compression is attempted.
-6. Fails open to the original output — including when no compressor is registered at
+3. Compresses all PostToolUse tool outputs when a host registers a compressor.
+4. Raw event stored before compression is attempted.
+5. Fails open to the original output — including when no compressor is registered at
    all, which is the default.
 
 ## Remaining / follow-ups
