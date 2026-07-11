@@ -5,6 +5,11 @@ on:
     tags:
       - "v*.*.*"
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v1.2.3). Leave empty to build artifacts only, without creating a release."
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -144,6 +149,9 @@ jobs:
     name: Create GitHub Release
     needs: build
     runs-on: ubuntu-latest
+    # Only release when a tag is available: a real tag push, or a tag supplied on manual dispatch.
+    # A manual run with no tag just builds the artifacts above and skips this job.
+    if: ${{ startsWith(github.ref, 'refs/tags/') || inputs.tag != '' }}
 
     steps:
       - name: Download artifacts
@@ -164,5 +172,7 @@ jobs:
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
+          # Tag push -> the pushed tag (github.ref_name); manual dispatch -> the supplied input tag.
+          tag_name: ${{ inputs.tag || github.ref_name }}
           files: ./release/*
           generate_release_notes: true
