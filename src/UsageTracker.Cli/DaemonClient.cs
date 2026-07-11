@@ -106,13 +106,7 @@ public sealed class DaemonClient : IDisposable
             if (string.IsNullOrWhiteSpace(exePath) || !File.Exists(exePath))
                 return false;
 
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = exePath,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                WindowStyle = ProcessWindowStyle.Hidden,
-            };
+            var startInfo = new ProcessStartInfo { FileName = exePath };
             // .dll executables are launched via the dotnet host.
             if (exePath.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
             {
@@ -120,7 +114,33 @@ public sealed class DaemonClient : IDisposable
                 startInfo.ArgumentList.Add(exePath);
             }
 
-            Process.Start(startInfo);
+            // Detach the daemon from the caller's console so it does NOT inherit (and hold open) the
+            // hook's stdout/stderr. If it did, the agent's hook reader would block on EOF until its
+            // timeout on the very first invocation (the one that auto-starts the daemon).
+            if (OperatingSystem.IsWindows())
+            {
+                // ShellExecute launches without passing the parent's std handles; Hidden keeps it windowless.
+                startInfo.UseShellExecute = true;
+                startInfo.WindowStyle = ProcessWindowStyle.Hidden;
+            }
+            else
+            {
+                // Redirect the inherited descriptors to pipes we immediately drop, so the daemon's stdout
+                // is not tied to the caller's; the daemon logs to its own file, not these streams.
+                startInfo.UseShellExecute = false;
+                startInfo.CreateNoWindow = true;
+                startInfo.RedirectStandardOutput = true;
+                startInfo.RedirectStandardError = true;
+                startInfo.RedirectStandardInput = true;
+            }
+
+            using var proc = Process.Start(startInfo);
+            if (proc is not null && startInfo.RedirectStandardOutput)
+            {
+                // Drain-and-discard so a chatty daemon never blocks on a full pipe buffer.
+                _ = proc.StandardOutput.BaseStream.CopyToAsync(Stream.Null);
+                _ = proc.StandardError.BaseStream.CopyToAsync(Stream.Null);
+            }
             return true;
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or System.ComponentModel.Win32Exception)

@@ -25,6 +25,8 @@ try
         "init" => await InitAsync(rest, token),
         "setup" => SetupCommand.Run(rest),
         "set-remote" => SetRemote(rest),
+        "set-compression" => SetCompression(rest),
+        "mcp" => Mcp(rest),
         "command" => await RunCommandAsync(rest, trace: false, token),
         "trace" => await RunCommandAsync(rest, trace: true, token),
         "status" => await StatusAsync(token),
@@ -90,6 +92,8 @@ static async Task<int> StatusAsync(CancellationToken token)
     Console.WriteLine($"Remote:  {GetString(root, "remote")}");
     Console.WriteLine($"Auth:    {GetString(root, "auth")}");
     Console.WriteLine($"User:    {GetString(root, "user") ?? "(none)"}");
+    Console.WriteLine($"Compress: {GetString(root, "compression") ?? "local"}");
+    Console.WriteLine($"MCP:     {GetString(root, "mcp") ?? "disabled"}");
     var deviceCode = GetString(root, "deviceCode");
     if (!string.IsNullOrWhiteSpace(deviceCode))
         Console.WriteLine($"\nDevice sign-in required:\n{deviceCode}");
@@ -117,6 +121,63 @@ static int SetRemote(string[] args)
     Console.WriteLine("Restart the daemon or wait for it to reload on the next command.");
     return 0;
 }
+
+static int SetCompression(string[] args)
+{
+    if (args.Length == 0 || !CompressionModes.IsValid(args[0]))
+    {
+        Console.Error.WriteLine("usage: usagetracker set-compression <local|off>");
+        Console.Error.WriteLine("  local  the daemon compacts large tool output locally (default, no backend round-trip)");
+        Console.Error.WriteLine("  off    ingest/mirror only; no compaction");
+        return 1;
+    }
+
+    var config = LoadConfig();
+    config.CompressionMode = args[0].ToLowerInvariant();
+    SaveConfig(config);
+    Console.WriteLine($"Compression mode: {config.CompressionMode}");
+    Console.WriteLine("Restart the daemon for the change to take effect.");
+    return 0;
+}
+
+static int Mcp(string[] args)
+{
+    var sub = args.Length > 0 ? args[0].ToLowerInvariant() : "show";
+    var config = LoadConfig();
+
+    switch (sub)
+    {
+        case "enable":
+        case "disable":
+            config.McpEnabled = sub == "enable";
+            if (config.McpEnabled && int.TryParse(OptionValue(args, "--port"), out var port) && port > 0)
+                config.McpPort = port;
+            SaveConfig(config);
+            Console.WriteLine($"MCP endpoint {(config.McpEnabled ? "enabled" : "disabled")}.");
+            if (config.McpEnabled)
+                Console.WriteLine($"Endpoint: {McpUrl(config)}");
+            Console.WriteLine("Restart the daemon for the change to take effect.");
+            return 0;
+
+        case "show":
+            if (!config.McpEnabled)
+            {
+                Console.WriteLine("MCP endpoint: disabled");
+                Console.WriteLine("Enable it with: usagetracker mcp enable [--port <n>]");
+                return 0;
+            }
+            Console.WriteLine($"MCP endpoint: {McpUrl(config)}");
+            Console.WriteLine("Add it to your IDE's MCP config as an HTTP server pointing at that URL.");
+            return 0;
+
+        default:
+            Console.Error.WriteLine("usage: usagetracker mcp [enable [--port <n>] | disable]");
+            return 1;
+    }
+}
+
+static string McpUrl(DaemonConfig config) =>
+    $"http://127.0.0.1:{(config.McpPort > 0 ? config.McpPort : CompressionModes.DefaultMcpPort)}/mcp";
 
 static async Task<int> InitAsync(string[] args, CancellationToken token)
 {
@@ -215,6 +276,8 @@ static void PrintUsage()
           init [--remote <url>] [--tenant <id>] [--client <id>] [--scope <s>] [--daemon-path <p>] [--loopback-port <n>]
           setup <claude|github>
           set-remote <endpoint>
+          set-compression <local|off>
+          mcp [enable [--port <n>] | disable]
           command <name> [args...] [--stdin]
           trace <name> [args...] [--stdin]
           status

@@ -44,7 +44,7 @@ public sealed class CommandProcessor
         var diagnostics = trace ? new StringBuilder() : null;
 
         Trace(diagnostics, $"command: {envelope.Kind} name: {platform}");
-        Trace(diagnostics, $"user: {_tokenService.CurrentIdentity?.UserEmail ?? "(none)"}");
+        Trace(diagnostics, $"user: {_tokenService.CurrentIdentity?.UserKey ?? "(none)"}");
 
         JsonElement root;
         try
@@ -100,11 +100,36 @@ public sealed class CommandProcessor
         {
             var client = _httpClientFactory.CreateClient(BackendClientName);
             var requestUri = new Uri(baseUri, $"api/hooks/{platform}");
-            var content = new StringContent(string.IsNullOrWhiteSpace(payload) ? "{}" : payload, Encoding.UTF8, "application/json");
-            using var response = await client.PostAsync(requestUri, content, cancellationToken);
+            using var request = new HttpRequestMessage(HttpMethod.Post, requestUri)
+            {
+                Content = new StringContent(string.IsNullOrWhiteSpace(payload) ? "{}" : payload, Encoding.UTF8, "application/json"),
+            };
+
+            // Dev-only: when Entra isn't configured the mirror carries no Bearer, so forward the OS-user
+            // identity via the backend's Development-only X-Dev-User-* headers for end-to-end attribution.
+            // In production Entra is configured (no fallback), and the backend ignores these outside Development.
+            if (!_tokenService.IsEntraConfigured && _tokenService.CurrentIdentity is { } dev)
+            {
+                request.Headers.TryAddWithoutValidation("X-Dev-User-Id", dev.UserId);
+                request.Headers.TryAddWithoutValidation("X-Dev-User-Name", dev.UserName);
+                if (!string.IsNullOrWhiteSpace(dev.UserEmail))
+                    request.Headers.TryAddWithoutValidation("X-Dev-User-Email", dev.UserEmail);
+                Trace(diagnostics, $"backend identity: dev-fallback {dev.UserKey}");
+            }
+
+            using var response = await client.SendAsync(request, cancellationToken);
             Trace(diagnostics, $"backend: {(int)response.StatusCode}");
             if (!response.IsSuccessStatusCode)
                 _logger.LogWarning("Backend mirror for {Platform} returned {Status}", platform, (int)response.StatusCode);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            // The backend HttpClient's own timeout fired (surfaces as TaskCanceledException). This is a
+            // best-effort mirror, so swallow it — local ingestion already succeeded and the hook must not
+            // fail just because the backend is slow or unreachable. (A genuine caller cancellation, where
+            // the token IS cancelled, is allowed to propagate.)
+            _logger.LogWarning("Backend mirror for {Platform} timed out", platform);
+            Trace(diagnostics, "backend: timeout");
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

@@ -14,14 +14,14 @@ namespace UsageTracker.Functions;
 /// (2) token claims on <c>HttpContext.User</c> (populated only if in-worker JWT validation is ever
 /// added); (3) the <c>X-User-Email</c> header - <em>Development only</em>, since the local daemon now
 /// supplies a real Entra token in production and this unauthenticated header must not be trusted there;
-/// (4) <c>X-Dev-User-*</c> headers (Development only); (5) the MCP no-HttpContext fallback below.
+/// (4) <c>X-Dev-User-*</c> headers (Development only); (5) the no-HttpContext fallback below.
 /// Uses <see cref="IHostEnvironment"/> and the HttpContext surfaced by the Functions ASP.NET Core
 /// integration.
 ///
-/// MCP tool trigger invocations carry no HttpContext - <c>ToolInvocationContext</c> exposes only
-/// the tool name and arguments, so there are no headers to read at all. For that path, Development
-/// falls back to a single configured local identity (Mcp:DefaultUser*), the same role the old
-/// stdio MCP server's UsageTracker:UserEmail setting played.
+/// Non-HTTP invocations (e.g. timer/health triggers) carry no HttpContext and thus no headers. For
+/// that path, Development falls back to a single configured local identity (Mcp:DefaultUser*). The
+/// project-context MCP tools no longer live here - they moved to the local daemon's loopback MCP
+/// endpoint, which supplies the real Entra (or dev OS) identity via DaemonUserContext.
 /// </summary>
 public sealed class FunctionsUserContext : IUserContext
 {

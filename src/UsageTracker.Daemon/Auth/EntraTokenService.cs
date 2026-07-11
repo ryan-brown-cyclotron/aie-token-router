@@ -42,26 +42,52 @@ public sealed class EntraTokenService : BackgroundService
         _logger = logger;
     }
 
+    /// <summary>True when Entra auth is configured (tenant/client/scope present); false in local dev.</summary>
+    public bool IsEntraConfigured => IsConfigured(_config);
+
     public CurrentUser? CurrentIdentity
     {
         get
         {
             var result = _current;
-            if (result is null) return null;
+            if (result is null) return DevFallbackIdentity();
 
             var oid = FindClaim(result, "oid", "http://schemas.microsoft.com/identity/claims/objectidentifier", "sub");
             var upn = FindClaim(result, "preferred_username", "upn", "email") ?? result.Account?.Username;
             var name = FindClaim(result, "name") ?? upn ?? oid;
-            if (string.IsNullOrWhiteSpace(oid) && string.IsNullOrWhiteSpace(upn)) return null;
+            if (string.IsNullOrWhiteSpace(oid) && string.IsNullOrWhiteSpace(upn)) return DevFallbackIdentity();
 
             return new CurrentUser(oid ?? upn!, name ?? "unknown", upn ?? string.Empty);
         }
     }
 
+    /// <summary>
+    /// Development-only identity used when Entra auth is not configured. Because production requires Entra +
+    /// Easy Auth, an unconfigured daemon is by definition a local/dev setup, so local ingestion is stamped
+    /// with the OS-signed-in user for realistic attribution. This identity is never trusted as a production
+    /// principal: with no Entra token the backend mirror carries no Bearer, and Easy Auth would reject it.
+    /// </summary>
+    private CurrentUser? DevFallbackIdentity()
+    {
+        if (IsConfigured(_config)) return null;
+
+        var user = Environment.UserName;
+        if (string.IsNullOrWhiteSpace(user)) return null;
+
+        var domain = Environment.UserDomainName;
+        var id = string.IsNullOrWhiteSpace(domain) ? user : $"{domain}\\{user}";
+        return new CurrentUser(id, user, string.Empty);
+    }
+
     public TokenStatus Status()
     {
         if (!IsConfigured(_config))
-            return new TokenStatus("not-configured", null, null, null, null);
+        {
+            var dev = DevFallbackIdentity();
+            return dev is not null
+                ? new TokenStatus("local-dev (unverified)", dev.UserKey, dev.UserId, null, null)
+                : new TokenStatus("not-configured", null, null, null, null);
+        }
 
         var result = _current;
         var identity = CurrentIdentity;

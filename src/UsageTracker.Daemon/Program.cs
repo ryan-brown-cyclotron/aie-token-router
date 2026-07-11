@@ -1,15 +1,20 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Http.Json;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using UsageTracker;
 using UsageTracker.Contracts;
 using UsageTracker.Daemon;
 using UsageTracker.Daemon.Auth;
 using UsageTracker.Daemon.Configuration;
+using UsageTracker.Daemon.Mcp;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Bootstrap config read (loopback port must be known before Kestrel is configured).
 var bootstrapConfig = LoadBootstrapConfig();
+var mcpEnabled = bootstrapConfig.McpEnabled;
+var mcpPort = bootstrapConfig.McpPort > 0 ? bootstrapConfig.McpPort : CompressionModes.DefaultMcpPort;
+var compressionOff = string.Equals(bootstrapConfig.CompressionMode, CompressionModes.Off, StringComparison.OrdinalIgnoreCase);
 
 // Local IPC transport: named pipe on Windows, Unix domain socket elsewhere. Both are per-user, so the
 // OS access control is the primary local trust boundary; the X-Local-Token below is defense-in-depth.
@@ -29,6 +34,11 @@ builder.WebHost.ConfigureKestrel(options =>
     // Optional loopback listener for HTTP-only hook hosts (e.g. GitHub Copilot) that cannot invoke a command.
     if (bootstrapConfig.LoopbackHttpPort > 0)
         options.ListenLocalhost(bootstrapConfig.LoopbackHttpPort);
+
+    // Loopback listener for the MCP endpoint. 127.0.0.1/::1 only - never bind a routable address; the
+    // MCP surface is unauthenticated (IDEs can't send our X-Local-Token) and relies on loopback isolation.
+    if (mcpEnabled && mcpPort != bootstrapConfig.LoopbackHttpPort)
+        options.ListenLocalhost(mcpPort);
 });
 
 builder.Services.Configure<JsonOptions>(o => o.SerializerOptions.TypeInfoResolverChain.Insert(0, ContractsJsonContext.Default));
@@ -43,6 +53,21 @@ builder.Services.AddScoped<CommandProcessor>();
 builder.Services.AddSingleton<IUserContext, DaemonUserContext>();
 builder.Services.AddUsageTrackerLibrary(builder.Configuration);
 
+// Compression mode: "off" drops the compressor so ToolOutputCompressionService resolves null and hooks
+// ingest/mirror without computing a modifiedResult. "local" (default) keeps the Library's default
+// compressor, which the daemon runs locally with no backend round-trip.
+if (compressionOff)
+    builder.Services.RemoveAll<IToolOutputCompressor>();
+
+// Local MCP endpoint (project-context tools) over loopback HTTP. Thin wrappers delegate to the Library.
+if (mcpEnabled)
+{
+    builder.Services
+        .AddMcpServer()
+        .WithHttpTransport(o => o.Stateless = true)
+        .WithTools<ProjectContextMcpTools>();
+}
+
 // Outbound backend client carries the Entra Bearer token; Easy Auth on the Container App validates it.
 // The base address is resolved per-call from current config (so `set-remote` takes effect without a restart).
 builder.Services.AddTransient<BackendBearerHandler>();
@@ -53,10 +78,11 @@ var app = builder.Build();
 
 var expectedLocalToken = app.Services.GetRequiredService<DaemonConfigStore>().GetOrCreateLocalToken();
 
-// Local-token guard on every endpoint except the unauthenticated liveness probe.
+// Local-token guard on every endpoint except the unauthenticated liveness probe and the MCP endpoint
+// (IDEs/MCP clients can't attach our X-Local-Token; /mcp is protected by loopback-only binding instead).
 app.Use(async (context, next) =>
 {
-    if (context.Request.Path.StartsWithSegments("/health"))
+    if (context.Request.Path.StartsWithSegments("/health") || context.Request.Path.StartsWithSegments("/mcp"))
     {
         await next();
         return;
@@ -87,6 +113,8 @@ app.MapGet("/status", (EntraTokenService tokens, DaemonConfigStore store) =>
         user = status.UserEmail,
         expiresOn = status.ExpiresOn,
         deviceCode = status.PendingDeviceCodeMessage,
+        compression = string.IsNullOrWhiteSpace(config.CompressionMode) ? CompressionModes.Local : config.CompressionMode,
+        mcp = config.McpEnabled ? $"http://127.0.0.1:{(config.McpPort > 0 ? config.McpPort : CompressionModes.DefaultMcpPort)}/mcp" : "disabled",
     });
 });
 
@@ -102,6 +130,11 @@ app.MapPost("/ingest/{platform}", async (string platform, HttpRequest request, C
     var response = await processor.ProcessAsync(envelope, ct);
     return Results.Text(response.Stdout, "application/json");
 });
+
+// Project-context MCP tools on the loopback listener (see ProjectContextMcpTools). Exempt from the
+// local-token guard above; reachable only on 127.0.0.1 when McpEnabled.
+if (mcpEnabled)
+    app.MapMcp("/mcp");
 
 app.Run();
 return;
