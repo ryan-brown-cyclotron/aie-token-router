@@ -126,9 +126,10 @@ static int SetCompression(string[] args)
 {
     if (args.Length == 0 || !CompressionModes.IsValid(args[0]))
     {
-        Console.Error.WriteLine("usage: usagetracker set-compression <local|off>");
-        Console.Error.WriteLine("  local  the daemon compacts large tool output locally (default, no backend round-trip)");
-        Console.Error.WriteLine("  off    ingest/mirror only; no compaction");
+        Console.Error.WriteLine("usage: usagetracker set-compression <local|off|remote>");
+        Console.Error.WriteLine("  remote  forward tool output to the backend (needs a remote endpoint), which may forward to Headroom (default)");
+        Console.Error.WriteLine("  local   the daemon compacts large tool output in-process (no backend round-trip)");
+        Console.Error.WriteLine("  off     ingest/mirror only; no compaction");
         return 1;
     }
 
@@ -136,7 +137,7 @@ static int SetCompression(string[] args)
     config.CompressionMode = args[0].ToLowerInvariant();
     SaveConfig(config);
     Console.WriteLine($"Compression mode: {config.CompressionMode}");
-    Console.WriteLine("Restart the daemon for the change to take effect.");
+    Console.WriteLine("Restart the daemon or wait for it to reload on the next command.");
     return 0;
 }
 
@@ -276,7 +277,7 @@ static void PrintUsage()
           init [--remote <url>] [--tenant <id>] [--client <id>] [--scope <s>] [--daemon-path <p>] [--loopback-port <n>]
           setup <claude|github>
           set-remote <endpoint>
-          set-compression <local|off>
+          set-compression <local|off|remote>
           mcp [enable [--port <n>] | disable]
           command <name> [args...] [--stdin]
           trace <name> [args...] [--stdin]

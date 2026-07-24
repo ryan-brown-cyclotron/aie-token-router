@@ -13,6 +13,8 @@ namespace UsageTracker.Contracts;
 [JsonSerializable(typeof(CommandEnvelope))]
 [JsonSerializable(typeof(CommandResponse))]
 [JsonSerializable(typeof(DaemonConfig))]
+[JsonSerializable(typeof(CompressRequest))]
+[JsonSerializable(typeof(CompressResponse))]
 [JsonSerializable(typeof(Dictionary<string, string>))]
 [JsonSerializable(typeof(JsonElement))]
 public sealed partial class ContractsJsonContext : JsonSerializerContext

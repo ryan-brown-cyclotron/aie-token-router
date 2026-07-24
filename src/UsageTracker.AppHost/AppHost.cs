@@ -18,8 +18,19 @@ var usageDatabase = cosmos.AddCosmosDatabase("usage-tracker");
 // The read-only admin dashboard (GET /api/dashboard) is rendered server-side inside this same
 // Function App via HtmlRenderer - see UsageTracker.Functions/Functions/DashboardFunctions.cs - so
 // there's no separate Dashboard project/resource to add here.
+// Generic context-optimization service (Headroom) - a small FastAPI sidecar built from its Dockerfile.
+// Its URL is handed to the Functions app below via the CompressionEndpoint setting; the backend
+// forwards to it only when that setting is present (see RemoteCompressionForwarder).
+var headroom = builder.AddDockerfile("headroom-compressor", "../UsageTracker.Compressor.Headroom")
+	.WithHttpEndpoint(targetPort: 8000, name: "http");
+
 var functions = builder.AddAzureFunctionsProject<Projects.UsageTracker_Functions>("usage-tracker-functions")
 	.WithHttpEndpoint(port: 7071, targetPort: 7071, name: "http")
-	.WithReference(usageDatabase);
+	.WithReference(usageDatabase)
+	// Inject the Headroom URL so the backend can forward to it (RemoteCompressionForwarder). A plain
+	// container isn't a connection-string/Functions-config resource, so pass the endpoint directly
+	// rather than WithReference. No WaitFor: the sidecar is optional and the forwarder fails open, so
+	// the backend must start even if the Headroom image can't build/start.
+	.WithEnvironment("CompressionEndpoint", headroom.GetEndpoint("http"));
 
 builder.Build().Run();

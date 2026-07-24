@@ -1,15 +1,46 @@
 # V2 Tool Output Compression
 
-> **Status: implemented as an extension point.** Compression is optional and off by
-> default. `IToolOutputCompressor` (`src/UsageTracker.Library/Infrastructure/Compression/IToolOutputCompressor.cs`)
-> is a pure interface — no implementation ships in the repo. `AddUsageTrackerLibrary`
-> registers no `IToolOutputCompressor`, so `ToolOutputCompressionService` resolves it as
-> `null` and hooks just ingest and log normally with no compression attempted. A host
-> that wants compression registers its own `IToolOutputCompressor` implementation.
+> **Status: implemented.** `IToolOutputCompressor`
+> (`src/UsageTracker.Library/Infrastructure/Compression/IToolOutputCompressor.cs`) is the
+> extension point; `AddUsageTrackerLibrary` registers `DeterministicToolOutputCompressor` as the
+> default. Hosts can override it. The daemon does: it registers a mode-aware router
+> (`ModeAwareToolOutputCompressor`) that picks the compressor per hook based on the current
+> `CompressionMode` config (see **Compression modes** below).
 
-Tool output compression is not a running sidecar or container. It is a single
-interface plus a gating options type; a host opts in by registering an implementation
-in its own composition root.
+## Compression modes (daemon)
+
+`DaemonConfig.CompressionMode` selects where compaction runs. It is resolved **per hook** by
+`ModeAwareToolOutputCompressor`, so `usagetracker set-compression <mode>` takes effect on the next
+command without a daemon restart (same per-call resolution as `RemoteEndpoint`).
+
+- **`remote` (default)** — the daemon forwards the tool output to the backend (`UsageTracker.Functions`,
+  reusing `RemoteEndpoint` + the Entra bearer client) via `POST api/compress`. The backend
+  (`RemoteCompressionForwarder`) forwards to the **Headroom sidecar** when a `CompressionEndpoint` is
+  configured (`POST /compress` with a single-message payload), logs compression metrics, and returns the
+  compressed text — otherwise it falls back to its local `IToolOutputCompressor`.
+- **`local`** — the daemon compacts in-process via `DeterministicToolOutputCompressor`, no backend round-trip.
+- **`off`** — no compaction; ingest/mirror only.
+
+### Headroom sidecar
+
+`src/UsageTracker.Compressor.Headroom` is a small, source-agnostic FastAPI service (uvicorn) that wraps
+the **`headroom-ai`** library (the bare `headroom` name on PyPI is an unrelated project). It exposes
+`POST /compress` (a list of messages in → compressed messages + `tokens_saved`/`tokens_before`/
+`tokens_after`/`compression_ratio`) and `GET /health`. It is wired into the AppHost via `AddDockerfile`
+and its URL is handed to the backend through the `CompressionEndpoint` setting.
+
+Behavior notes (verified against `headroom-ai`):
+
+- **Aggressive by design.** `HeadroomService` runs `compress` with a `CompressConfig` that disables all
+  protection (`compress_user_messages=True`, `protect_recent=0`, `protect_analysis_context=False`).
+  Headroom protects `user` and recent messages by default; since the backend forwards a single tool
+  output wrapped as one `user` message, those defaults would yield 0 savings — the aggressive config is
+  what makes single-output compaction work.
+- **JSON compresses for free; plain text needs `[ml]`.** The base `headroom-ai` install compresses
+  structured/JSON content (SmartCrusher) with no extra deps (~60% on repetitive JSON arrays). Plain-text
+  compaction (Kompress) requires the `[ml]` extra (torch + transformers, ~2GB image + a model download),
+  so the base image leaves plain text unchanged. The daemon's local `DeterministicToolOutputCompressor`
+  still handles plain text, and the backend falls back to it when the sidecar returns no change.
 
 ## Extension point
 

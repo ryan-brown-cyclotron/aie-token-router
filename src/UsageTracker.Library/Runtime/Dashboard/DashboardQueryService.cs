@@ -26,7 +26,14 @@ public sealed record SessionView(
     DateTimeOffset LastEventAt,
     int ToolCalls,
     TokenUsage Usage,
-    IReadOnlyDictionary<string, int> Events);
+    IReadOnlyDictionary<string, int> Events,
+    IReadOnlyList<SessionModelUsage> Models);
+
+/// <summary>Per-model token split within a single session (a session may span multiple models).</summary>
+public sealed record SessionModelUsage(string Model, TokenUsage Usage)
+{
+    public long TotalTokens => Usage.InputTokens + Usage.OutputTokens + Usage.CacheReadTokens + Usage.CacheCreationTokens;
+}
 
 /// <summary>Per-project usage rollup derived from the durable usage summary.</summary>
 public sealed record ProjectUsageRow(
@@ -59,7 +66,11 @@ public sealed class DashboardQueryService : IDashboardQueryService
         _store.AllSessions()
             .Select(s => new SessionView(
                 s.SessionId, s.Platform, s.User, s.ProjectKey, s.ProjectName, s.AttributionConfidence,
-                s.Model, s.StartedAt, s.LastEventAt, s.ToolCalls, s.Usage, s.EventCounts))
+                s.Model, s.StartedAt, s.LastEventAt, s.ToolCalls, s.Usage, s.EventCounts,
+                s.ModelUsage
+                    .Select(kv => new SessionModelUsage(kv.Key, kv.Value))
+                    .OrderByDescending(m => m.TotalTokens)
+                    .ToList()))
             .ToList();
 
     public async Task<IReadOnlyCollection<UsageSummaryRow>> UsageAsync(DateTimeOffset? from, DateTimeOffset? to, CancellationToken cancellationToken = default)

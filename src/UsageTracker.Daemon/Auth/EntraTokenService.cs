@@ -45,6 +45,9 @@ public sealed class EntraTokenService : BackgroundService
     /// <summary>True when Entra auth is configured (tenant/client/scope present); false in local dev.</summary>
     public bool IsEntraConfigured => IsConfigured(_config);
 
+    /// <summary>True when a live (non-expired) Entra token is actually held right now.</summary>
+    public bool HasVerifiedToken => _current is { } result && result.ExpiresOn > DateTimeOffset.UtcNow;
+
     public CurrentUser? CurrentIdentity
     {
         get
@@ -62,15 +65,16 @@ public sealed class EntraTokenService : BackgroundService
     }
 
     /// <summary>
-    /// Development-only identity used when Entra auth is not configured. Because production requires Entra +
-    /// Easy Auth, an unconfigured daemon is by definition a local/dev setup, so local ingestion is stamped
-    /// with the OS-signed-in user for realistic attribution. This identity is never trusted as a production
-    /// principal: with no Entra token the backend mirror carries no Bearer, and Easy Auth would reject it.
+    /// OS-signed-in identity used whenever we don't yet hold a resolved Entra identity - whether Entra auth
+    /// isn't configured at all, or it is configured but acquisition hasn't completed yet (first run, no
+    /// cached account, silent SSO still pending/failing). Local ingestion is stamped with this so attribution
+    /// is never blank while sign-in catches up. This identity is never trusted as a production principal on
+    /// its own: with no Entra token the backend mirror carries no Bearer, and Easy Auth would reject it - it
+    /// only reaches the backend via the Development-only X-Dev-User-* headers (see <c>CommandProcessor</c>),
+    /// which the backend ignores outside Development.
     /// </summary>
-    private CurrentUser? DevFallbackIdentity()
+    private static CurrentUser? DevFallbackIdentity()
     {
-        if (IsConfigured(_config)) return null;
-
         var user = Environment.UserName;
         if (string.IsNullOrWhiteSpace(user)) return null;
 

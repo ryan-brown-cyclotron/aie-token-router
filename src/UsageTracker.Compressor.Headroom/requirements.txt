@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+# headroom-ai with ML support for plain-text compression (Kompress).
+# Base install (SmartCrusher) compresses JSON/structured content for free (~60%).
+# [ml] adds Kompress for plain-text (torch + transformers, ~2GB).
+# The model is pre-downloaded in the Dockerfile so first-call doesn't stall.
+headroom-ai

@@ -18,6 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\UsageTracker.Contracts\UsageTracker.Contracts.csproj" />
     <ProjectReference Include="..\UsageTracker.Library\UsageTracker.Library.csproj" />
     <ProjectReference Include="..\UsageTracker.ServiceDefaults\UsageTracker.ServiceDefaults.csproj" />
   </ItemGroup>

@@ -23,10 +23,14 @@ public sealed class DaemonConfig
     public int LoopbackHttpPort { get; set; }
 
     /// <summary>
-    /// Where tool-output compaction runs. <c>local</c> (default) = the daemon computes the compacted
-    /// <c>modifiedResult</c> with no backend round-trip; <c>off</c> = ingest/mirror only, no compaction.
+    /// Where tool-output compaction runs. Resolved by the daemon on every hook, so changing it via
+    /// <c>set-compression</c> takes effect without a restart. <c>remote</c> (default) = the daemon
+    /// forwards the tool output to the backend (reusing <see cref="RemoteEndpoint"/> + the Entra bearer
+    /// path), which optionally forwards to the Headroom compression service and logs metrics;
+    /// <c>local</c> = the daemon computes the compacted <c>modifiedResult</c> in-process with no backend
+    /// round-trip; <c>off</c> = ingest/mirror only, no compaction.
     /// </summary>
-    public string CompressionMode { get; set; } = CompressionModes.Local;
+    public string CompressionMode { get; set; } = CompressionModes.Remote;
 
     /// <summary>When true, the daemon exposes the project-context MCP tools over a loopback HTTP endpoint.</summary>
     public bool McpEnabled { get; set; }
@@ -47,10 +51,14 @@ public static class CompressionModes
     public const string Local = "local";
     public const string Off = "off";
 
+    /// <summary>Forward tool output to the backend, which optionally forwards to the Headroom service.</summary>
+    public const string Remote = "remote";
+
     /// <summary>The default loopback port for the MCP endpoint when <see cref="DaemonConfig.McpPort"/> is 0.</summary>
     public const int DefaultMcpPort = 47615;
 
     public static bool IsValid(string? mode) =>
         string.Equals(mode, Local, StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(mode, Off, StringComparison.OrdinalIgnoreCase);
+        string.Equals(mode, Off, StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(mode, Remote, StringComparison.OrdinalIgnoreCase);
 }

@@ -2,8 +2,10 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.JSInterop;
 using MudBlazor.Services;
 using UsageTracker.Functions.Dashboard.Pages;
+using UsageTracker.Functions.Infrastructure;
 
 namespace UsageTracker.Tests;
 
@@ -35,6 +37,7 @@ public class DashboardPageTests
         services.AddSingleton<IDashboardQueryService>(dashboard);
         services.AddLogging();
         services.AddMudServices();
+        services.AddSingleton<IJSRuntime, NoOpJsRuntime>();
         await using var provider = services.BuildServiceProvider();
 
         await using var renderer = new HtmlRenderer(provider, NullLoggerFactory.Instance);
@@ -57,8 +60,29 @@ public class DashboardPageTests
         var html = await RenderAsync<DashboardPage>(dashboard);
 
         Assert.Contains("UsageTracker", html);
-        Assert.Contains("<h2>1</h2>", html); // session count
+        Assert.Contains("<div class=\"ut-kpi-value\">1</div>", html); // session count
         Assert.Contains("150", html); // total tokens (100 + 50)
+    }
+
+    [Fact]
+    public async Task DashboardPage_tabs_are_css_only_with_no_onclick_handlers()
+    {
+        // This page renders via a non-interactive HtmlRenderer (see DashboardFunctions.cs) - there's
+        // no circuit, so @onclick handlers never fire in the browser. Guards against reintroducing
+        // click-driven tab state that silently does nothing for users. (MudChart brings its own
+        // inert internal event markup, so this checks the tab bar specifically rather than the
+        // whole document.)
+        var html = await RenderAsync<DashboardPage>(new FakeDashboardQueryService());
+
+        var tabsStart = html.IndexOf("<nav class=\"ut-tabs\"", StringComparison.Ordinal);
+        var tabsEnd = html.IndexOf("</nav>", tabsStart, StringComparison.Ordinal);
+        Assert.True(tabsStart >= 0 && tabsEnd > tabsStart, "Expected to find the ut-tabs nav block.");
+        var tabsHtml = html[tabsStart..tabsEnd];
+
+        Assert.DoesNotContain("onclick", tabsHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("id=\"ut-tab-overview\"", html);
+        Assert.Contains("for=\"ut-tab-overview\"", tabsHtml);
+        Assert.Contains("data-pane=\"sessions\"", html);
     }
 
     [Fact]
@@ -111,7 +135,7 @@ public class DashboardPageTests
         Assert.Contains("user@example.com", html);
     }
 
-    private static SessionView MakeSession(string sessionId) => new(
+    private static SessionView MakeSession(string sessionId, IReadOnlyList<SessionModelUsage>? models = null) => new(
         SessionId: sessionId,
         Platform: "claude-code",
         User: "user@example.com",
@@ -123,5 +147,6 @@ public class DashboardPageTests
         LastEventAt: DateTimeOffset.UtcNow,
         ToolCalls: 2,
         Usage: new TokenUsage(10, 5, 0, 0, 1),
-        Events: new Dictionary<string, int>());
+        Events: new Dictionary<string, int>(),
+        Models: models ?? new[] { new SessionModelUsage("claude-opus-4-8", new TokenUsage(10, 5, 0, 0, 1)) });
 }

@@ -105,10 +105,11 @@ public sealed class CommandProcessor
                 Content = new StringContent(string.IsNullOrWhiteSpace(payload) ? "{}" : payload, Encoding.UTF8, "application/json"),
             };
 
-            // Dev-only: when Entra isn't configured the mirror carries no Bearer, so forward the OS-user
+            // Dev-only: whenever we don't yet hold a verified Entra token - unconfigured, or configured but
+            // acquisition still pending/failing - the mirror carries no Bearer, so forward the OS-user
             // identity via the backend's Development-only X-Dev-User-* headers for end-to-end attribution.
-            // In production Entra is configured (no fallback), and the backend ignores these outside Development.
-            if (!_tokenService.IsEntraConfigured && _tokenService.CurrentIdentity is { } dev)
+            // The backend ignores these outside Development, so this is a no-op once deployed to production.
+            if (!_tokenService.HasVerifiedToken && _tokenService.CurrentIdentity is { } dev)
             {
                 request.Headers.TryAddWithoutValidation("X-Dev-User-Id", dev.UserId);
                 request.Headers.TryAddWithoutValidation("X-Dev-User-Name", dev.UserName);

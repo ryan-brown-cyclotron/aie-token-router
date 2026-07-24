@@ -2,11 +2,13 @@
 @using MudBlazor
 
 @* ============================================================
-   UsageTracker — restyled in the Cyclotron Design System
-   (Midnight dark surface, Sky-Blue accents, hexagon motif).
-   Assumes the Cyclotron token stylesheets are linked in the host
-   layout (styles.css). All look-and-feel lives in the scoped
-   <style> block below; the @code block is unchanged.
+   UsageTracker — Cyclotron Design System, tabbed layout.
+   (Midnight dark surface, Sky-Blue accents, hexagon motif.)
+   Tabs: Overview (KPIs + charts) · Sessions · Projects · Agent usage.
+   This page renders through a non-interactive HtmlRenderer (see
+   DashboardFunctions.cs) - no circuit, no @@onclick. Tab switching is
+   CSS-only (radio + label[for] + :checked); see the comment above the
+   tab bar markup below. Data loading and view models are unchanged.
    ============================================================ *@
 
 <DashboardLayout Title="UsageTracker">
@@ -34,165 +36,222 @@
         }
         else
         {
-            @* ---------- KPI tiles ---------- *@
-            <div class="ut-kpis">
-                <div class="ut-kpi" style="--bar: var(--color-sky-blue);">
-                    <div class="ut-kpi-head"><span class="ut-kpi-label">Live sessions</span>
-                        <span class="ut-hex"><iconify-icon icon="fluent:pulse-24-regular" width="18"></iconify-icon></span></div>
-                    <div class="ut-kpi-value">@_sessions.Count</div>
-                    <div class="ut-kpi-sub">active right now</div>
-                </div>
-                <div class="ut-kpi" style="--bar: var(--color-true-blue);">
-                    <div class="ut-kpi-head"><span class="ut-kpi-label">Tracked projects</span>
-                        <span class="ut-hex"><iconify-icon icon="fluent:folder-24-regular" width="18"></iconify-icon></span></div>
-                    <div class="ut-kpi-value">@_projects.Count</div>
-                    <div class="ut-kpi-sub">with recorded usage</div>
-                </div>
-                <div class="ut-kpi" style="--bar: var(--gradient-blue-purple);">
-                    <div class="ut-kpi-head"><span class="ut-kpi-label">Total tokens</span>
-                        <span class="ut-hex"><iconify-icon icon="fluent:data-histogram-24-regular" width="18"></iconify-icon></span></div>
-                    <div class="ut-kpi-value">@Short(_totalTokens)</div>
-                    <div class="ut-kpi-sub">@_totalTokens.ToString("N0") total</div>
-                </div>
-                <div class="ut-kpi" style="--bar: var(--color-eminence);">
-                    <div class="ut-kpi-head"><span class="ut-kpi-label">Tool calls</span>
-                        <span class="ut-hex"><iconify-icon icon="fluent:wrench-24-regular" width="18"></iconify-icon></span></div>
-                    <div class="ut-kpi-value">@Short(_sessions.Sum(s => (long)s.ToolCalls))</div>
-                    <div class="ut-kpi-sub">across live sessions</div>
-                </div>
-            </div>
+            @* ---------- Tab bar ----------
+               This page is rendered by a non-interactive HtmlRenderer (see DashboardFunctions.cs):
+               there's no circuit/WASM runtime, so @@onclick handlers never fire in the browser.
+               Tabs are implemented CSS-only: a radio-per-tab (kept focusable, visually hidden)
+               paired with <label for>, switched via :checked sibling selectors. Native radio-group
+               keyboard behavior (Tab in, arrow keys between options) makes this operable without JS. *@
+            <input type="radio" id="ut-tab-overview" name="ut-tab" class="ut-tab-input" checked />
+            <input type="radio" id="ut-tab-sessions" name="ut-tab" class="ut-tab-input" />
+            <input type="radio" id="ut-tab-projects" name="ut-tab" class="ut-tab-input" />
+            <input type="radio" id="ut-tab-agent" name="ut-tab" class="ut-tab-input" />
 
-            @* ---------- Charts (MudBlazor) ---------- *@
-            <div class="ut-charts">
-                <div class="ut-panel">
-                    <div class="ut-panel-head">
-                        <h2>Token usage over time</h2>
-                        <p>Total tokens per day (M) · last 7 days</p>
-                    </div>
-                    <MudChart T="double" ChartType="ChartType.Line" ChartSeries="_usageSeries" ChartLabels="_usageLabels"
-                              ChartOptions="_lineOptions" Width="100%" Height="230px" />
-                </div>
-                <div class="ut-panel">
-                    <div class="ut-panel-head">
-                        <h2>Model split</h2>
-                        <p>Share of total tokens</p>
-                    </div>
-                    <div class="ut-donut-wrap">
-                        <MudChart T="double" ChartType="ChartType.Donut" ChartSeries="_modelSeries" ChartLabels="_modelLabels"
-                                  ChartOptions="_donutOptions" Width="220px" Height="220px" />
-                    </div>
-                </div>
-                <div class="ut-panel ut-panel--full">
-                    <div class="ut-panel-head">
-                        <h2>Top projects by tokens</h2>
-                        <p>All-time total (M)</p>
-                    </div>
-                    <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="_projectSeries" ChartLabels="_projectLabels"
-                              ChartOptions="_barOptions" Width="100%" Height="240px" />
-                </div>
-            </div>
+            <nav class="ut-tabs" aria-label="UsageTracker views">
+                <label for="ut-tab-overview" class="ut-tab">
+                    <iconify-icon icon="fluent:grid-24-regular" width="16"></iconify-icon>
+                    Overview
+                </label>
+                <label for="ut-tab-sessions" class="ut-tab">
+                    <iconify-icon icon="fluent:pulse-24-regular" width="16"></iconify-icon>
+                    Sessions <span class="ut-tab-count">@_sessions.Count</span>
+                </label>
+                <label for="ut-tab-projects" class="ut-tab">
+                    <iconify-icon icon="fluent:folder-24-regular" width="16"></iconify-icon>
+                    Projects <span class="ut-tab-count">@_projects.Count</span>
+                </label>
+                <label for="ut-tab-agent" class="ut-tab">
+                    <iconify-icon icon="fluent:data-histogram-24-regular" width="16"></iconify-icon>
+                    Agent usage
+                </label>
+            </nav>
 
-            @* ---------- Sessions ---------- *@
-            <section id="sessions" class="ut-section">
-                <div class="ut-sec-head"><h2>Sessions</h2>
-                    <span class="ut-count">@_sessions.Count active</span></div>
+            @* ================= Overview ================= *@
+            <div class="ut-pane" data-pane="overview">
 
-                @if (_sessions.Count == 0)
-                {
-                    <p class="ut-empty">No sessions recorded yet.</p>
-                }
-                else
-                {
-                    <div class="ut-rows">
-                        @foreach (var s in _sessions)
-                        {
-                            <div class="ut-row ut-row--session">
-                                <div>
-                                    <div class="ut-id"><span class="ut-plat-dot" style="background:@PlatformColor(s.Platform)"></span>@s.SessionId</div>
-                                    <div class="ut-meta">@s.Platform</div>
-                                </div>
-                                <div><div class="ut-h">User</div><div class="ut-v">@s.User</div></div>
-                                <div>
-                                    <div class="ut-h">Project</div><div class="ut-v">@s.ProjectName</div>
-                                    <span class="ut-badge ut-badge--@Conf(s.AttributionConfidence)">@s.AttributionConfidence</span>
-                                </div>
-                                <div class="ut-metrics">
-                                    <div><div class="ut-h">Model</div><div class="ut-v">@s.Model</div></div>
-                                    <div class="ut-num"><div class="ut-h">Tools</div><div class="ut-v-num">@s.ToolCalls</div></div>
-                                    <div class="ut-num"><div class="ut-h">In / Out</div>
-                                        <div class="ut-v-num"><span class="in">@Short(s.Usage.InputTokens)</span> / <span class="out">@Short(s.Usage.OutputTokens)</span></div></div>
-                                </div>
-                                <div class="ut-num"><div class="ut-h">Last event</div>
-                                    <div class="ut-v">@s.LastEventAt.LocalDateTime.ToString("g")</div></div>
-                            </div>
-                        }
-                    </div>
-                }
-            </section>
-
-            @* ---------- Projects ---------- *@
-            <section id="projects" class="ut-section">
-                <div class="ut-sec-head"><h2>Projects</h2></div>
-
-                @if (_projects.Count == 0)
-                {
-                    <p class="ut-empty">No project usage recorded yet.</p>
-                }
-                else
-                {
-                    <div class="ut-cards">
-                        @foreach (var p in _projects)
-                        {
-                            var pct = _maxProjectTokens > 0 ? (int)(p.TotalTokens * 100 / _maxProjectTokens) : 0;
-                            <div class="ut-card" style="--bar: var(--color-true-blue);">
-                                <div class="ut-card-head">
-                                    <div><h3>@p.ProjectName</h3><code>@p.ProjectKey</code></div>
-                                    <div class="ut-card-total"><div class="ut-v-big">@Short(p.TotalTokens)</div><div class="ut-h">Total tokens</div></div>
-                                </div>
-                                <div class="ut-bar"><div class="ut-bar-fill" style="width:@(pct)%"></div></div>
-                                <div class="ut-card-foot">
-                                    <span><span class="ut-muted">Sessions </span><b>@p.Sessions</b></span>
-                                    <span><span class="ut-muted">Events </span><b>@p.Events</b></span>
-                                    <span><span class="in">@Short(p.InputTokens)</span> in · <span class="out">@Short(p.OutputTokens)</span> out</span>
-                                </div>
-                            </div>
-                        }
-                    </div>
-                }
-            </section>
-
-            @* ---------- Agent usage ---------- *@
-            <section id="agent-usage" class="ut-section">
-                <div class="ut-sec-head-col"><h2>Agent usage</h2>
-                    <p>Usage rolled up by platform, model, user, and project.</p></div>
-
-                @if (_usage.Count == 0)
-                {
-                    <p class="ut-empty">No usage recorded yet.</p>
-                }
-                else
-                {
-                    <div class="ut-table">
-                        <div class="ut-thead">
-                            <span>Platform</span><span>Model</span><span>User</span><span>Project</span>
-                            <span>Confidence</span><span class="r">Sessions</span><span class="r">In</span><span class="r">Out</span>
+                    <div class="ut-kpis">
+                        <div class="ut-kpi" style="--bar: var(--color-sky-blue);">
+                            <div class="ut-kpi-head"><span class="ut-kpi-label">Live sessions</span>
+                                <span class="ut-hex"><iconify-icon icon="fluent:pulse-24-regular" width="18"></iconify-icon></span></div>
+                            <div class="ut-kpi-value">@_sessions.Count</div>
+                            <div class="ut-kpi-sub">active right now</div>
                         </div>
-                        @foreach (var r in _usage)
+                        <div class="ut-kpi" style="--bar: var(--color-true-blue);">
+                            <div class="ut-kpi-head"><span class="ut-kpi-label">Tracked projects</span>
+                                <span class="ut-hex"><iconify-icon icon="fluent:folder-24-regular" width="18"></iconify-icon></span></div>
+                            <div class="ut-kpi-value">@_projects.Count</div>
+                            <div class="ut-kpi-sub">with recorded usage</div>
+                        </div>
+                        <div class="ut-kpi" style="--bar: var(--gradient-blue-purple);">
+                            <div class="ut-kpi-head"><span class="ut-kpi-label">Total tokens</span>
+                                <span class="ut-hex"><iconify-icon icon="fluent:data-histogram-24-regular" width="18"></iconify-icon></span></div>
+                            <div class="ut-kpi-value">@Short(_totalTokens)</div>
+                            <div class="ut-kpi-sub">@_totalTokens.ToString("N0") total</div>
+                        </div>
+                        <div class="ut-kpi" style="--bar: var(--color-eminence);">
+                            <div class="ut-kpi-head"><span class="ut-kpi-label">Tool calls</span>
+                                <span class="ut-hex"><iconify-icon icon="fluent:wrench-24-regular" width="18"></iconify-icon></span></div>
+                            <div class="ut-kpi-value">@Short(_sessions.Sum(s => (long)s.ToolCalls))</div>
+                            <div class="ut-kpi-sub">across live sessions</div>
+                        </div>
+                    </div>
+
+                    <div class="ut-charts">
+                        <div class="ut-panel">
+                            <div class="ut-panel-head">
+                                <h2>Token usage over time</h2>
+                                <p>Total tokens per day (M) · last 7 days</p>
+                            </div>
+                            <MudChart T="double" ChartType="ChartType.Line" ChartSeries="_usageSeries" ChartLabels="_usageLabels"
+                                      ChartOptions="_lineOptions" Width="100%" Height="230px" />
+                        </div>
+                        <div class="ut-panel">
+                            <div class="ut-panel-head">
+                                <h2>Model split</h2>
+                                <p>Share of total tokens</p>
+                            </div>
+                            <div class="ut-donut-wrap">
+                                <MudChart T="double" ChartType="ChartType.Donut" ChartSeries="_modelSeries" ChartLabels="_modelLabels"
+                                          ChartOptions="_donutOptions" Width="220px" Height="220px" />
+                            </div>
+                        </div>
+                        <div class="ut-panel ut-panel--full">
+                            <div class="ut-panel-head">
+                                <h2>Top projects by tokens</h2>
+                                <p>All-time total (M)</p>
+                            </div>
+                            <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="_projectSeries" ChartLabels="_projectLabels"
+                                      ChartOptions="_barOptions" Width="100%" Height="240px" />
+                        </div>
+                    </div>
+
+            </div>
+
+            @* ================= Sessions ================= *@
+            <div class="ut-pane" data-pane="sessions">
+                    <section id="sessions" class="ut-section">
+                        <div class="ut-sec-head"><h2>Sessions</h2>
+                            <span class="ut-count">@_sessions.Count active</span></div>
+
+                        @if (_sessions.Count == 0)
                         {
-                            <div class="ut-trow">
-                                <span class="ut-plat"><span class="ut-plat-dot" style="background:@PlatformColor(r.Platform)"></span>@r.Platform</span>
-                                <span class="ut-muted2">@r.Model</span>
-                                <span class="ut-muted2">@r.User</span>
-                                <span class="ut-muted2">@r.ProjectName</span>
-                                <span><span class="ut-badge ut-badge--@Conf(r.AttributionConfidence)">@r.AttributionConfidence</span></span>
-                                <span class="r b">@r.Sessions</span>
-                                <span class="r in">@Short(r.InputTokens)</span>
-                                <span class="r out">@Short(r.OutputTokens)</span>
+                            <p class="ut-empty">No sessions recorded yet.</p>
+                        }
+                        else
+                        {
+                            <div class="ut-rows">
+                                @foreach (var s in _sessions)
+                                {
+                                    <div class="ut-row ut-row--session">
+                                        <div>
+                                            <div class="ut-id"><span class="ut-plat-dot" style="background:@PlatformColor(s.Platform)"></span>@s.SessionId</div>
+                                            <div class="ut-meta">@s.Platform</div>
+                                        </div>
+                                        <div><div class="ut-h">User</div><div class="ut-v">@s.User</div></div>
+                                        <div>
+                                            <div class="ut-h">Project</div><div class="ut-v">@s.ProjectName</div>
+                                            <span class="ut-badge ut-badge--@Conf(s.AttributionConfidence)">@s.AttributionConfidence</span>
+                                        </div>
+                                        <div class="ut-metrics">
+                                            <div>
+                                                <div class="ut-h">@(s.Models.Count > 1 ? $"Models ({s.Models.Count})" : "Model")</div>
+                                                @if (s.Models.Count <= 1)
+                                                {
+                                                    <div class="ut-v">@s.Model</div>
+                                                }
+                                                else
+                                                {
+                                                    <div class="ut-models">
+                                                        @foreach (var m in s.Models)
+                                                        {
+                                                            <span class="ut-model-chip" title="@m.Model">
+                                                                <span class="ut-model-name">@m.Model</span>
+                                                                <span class="ut-model-split"><span class="in">@Short(m.Usage.InputTokens)</span> / <span class="out">@Short(m.Usage.OutputTokens)</span></span>
+                                                            </span>
+                                                        }
+                                                    </div>
+                                                }
+                                            </div>
+                                            <div class="ut-num"><div class="ut-h">Tools</div><div class="ut-v-num">@s.ToolCalls</div></div>
+                                            <div class="ut-num"><div class="ut-h">In / Out</div>
+                                                <div class="ut-v-num"><span class="in">@Short(s.Usage.InputTokens)</span> / <span class="out">@Short(s.Usage.OutputTokens)</span></div></div>
+                                        </div>
+                                        <div class="ut-num"><div class="ut-h">Last event</div>
+                                            <div class="ut-v">@s.LastEventAt.LocalDateTime.ToString("g")</div></div>
+                                    </div>
+                                }
                             </div>
                         }
-                    </div>
-                }
-            </section>
+                    </section>
+            </div>
+
+            @* ================= Projects ================= *@
+            <div class="ut-pane" data-pane="projects">
+                    <section id="projects" class="ut-section">
+                        <div class="ut-sec-head"><h2>Projects</h2></div>
+
+                        @if (_projects.Count == 0)
+                        {
+                            <p class="ut-empty">No project usage recorded yet.</p>
+                        }
+                        else
+                        {
+                            <div class="ut-cards">
+                                @foreach (var p in _projects)
+                                {
+                                    var pct = _maxProjectTokens > 0 ? (int)(p.TotalTokens * 100 / _maxProjectTokens) : 0;
+                                    <div class="ut-card" style="--bar: var(--color-true-blue);">
+                                        <div class="ut-card-head">
+                                            <div><h3>@p.ProjectName</h3><code>@p.ProjectKey</code></div>
+                                            <div class="ut-card-total"><div class="ut-v-big">@Short(p.TotalTokens)</div><div class="ut-h">Total tokens</div></div>
+                                        </div>
+                                        <div class="ut-bar"><div class="ut-bar-fill" style="width:@(pct)%"></div></div>
+                                        <div class="ut-card-foot">
+                                            <span><span class="ut-muted">Sessions </span><b>@p.Sessions</b></span>
+                                            <span><span class="ut-muted">Events </span><b>@p.Events</b></span>
+                                            <span><span class="in">@Short(p.InputTokens)</span> in · <span class="out">@Short(p.OutputTokens)</span> out</span>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </section>
+            </div>
+
+            @* ================= Agent usage ================= *@
+            <div class="ut-pane" data-pane="agent">
+                    <section id="agent-usage" class="ut-section">
+                        <div class="ut-sec-head-col"><h2>Agent usage</h2>
+                            <p>Usage rolled up by platform, model, user, and project.</p></div>
+
+                        @if (_usage.Count == 0)
+                        {
+                            <p class="ut-empty">No usage recorded yet.</p>
+                        }
+                        else
+                        {
+                            <div class="ut-table">
+                                <div class="ut-thead">
+                                    <span>Platform</span><span>Model</span><span>User</span><span>Project</span>
+                                    <span>Confidence</span><span class="r">Sessions</span><span class="r">In</span><span class="r">Out</span>
+                                </div>
+                                @foreach (var r in _usage)
+                                {
+                                    <div class="ut-trow">
+                                        <span class="ut-plat"><span class="ut-plat-dot" style="background:@PlatformColor(r.Platform)"></span>@r.Platform</span>
+                                        <span class="ut-muted2">@r.Model</span>
+                                        <span class="ut-muted2">@r.User</span>
+                                        <span class="ut-muted2">@r.ProjectName</span>
+                                        <span><span class="ut-badge ut-badge--@Conf(r.AttributionConfidence)">@r.AttributionConfidence</span></span>
+                                        <span class="r b">@r.Sessions</span>
+                                        <span class="r in">@Short(r.InputTokens)</span>
+                                        <span class="r out">@Short(r.OutputTokens)</span>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </section>
+            </div>
         }
     </div>
 </DashboardLayout>
@@ -206,7 +265,7 @@
           padding:28px 32px 72px; }
     .ut h1,.ut h2,.ut h3 { font-weight:600; letter-spacing:-.02em; margin:0; }
 
-    .ut-topbar { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; flex-wrap:wrap; margin-bottom:30px; }
+    .ut-topbar { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; flex-wrap:wrap; margin-bottom:26px; }
     .ut-title { display:flex; align-items:center; gap:16px; }
     .ut-mark { width:46px; height:46px; object-fit:contain; filter:drop-shadow(0 4px 14px rgba(96,216,238,.35)); }
     .ut-title-row { display:flex; align-items:center; gap:10px; }
@@ -225,6 +284,51 @@
     .ut-alert { background:rgba(255,187,22,.12); border:1px solid rgba(255,187,22,.4); color:var(--color-yellow);
                 padding:14px 18px; border-radius:12px; }
 
+    /* ---------- Tab bar (CSS-only: radio-per-tab + label[for], see markup comment) ---------- */
+    .ut-tab-input { position:absolute; opacity:0; width:1px; height:1px; margin:-1px; }
+    .ut-tabs { display:flex; gap:4px; margin-bottom:24px; border-bottom:1px solid rgba(253,251,255,.1); }
+    .ut-tab { position:relative; display:inline-flex; align-items:center; gap:8px; cursor:pointer; font:inherit;
+              font-size:14px; font-weight:600; color:var(--neutral-400); background:transparent;
+              padding:11px 18px 13px; border-radius:10px 10px 0 0; transition:color .15s ease, background .15s ease;
+              user-select:none; }
+    .ut-tab:hover { color:var(--neutral-100); background:rgba(253,251,255,.04); }
+    .ut-tab iconify-icon { opacity:.85; }
+    .ut-tab-count { font-size:11px; font-weight:600; color:var(--color-sky-blue); background:rgba(96,216,238,.12);
+                    border:1px solid rgba(96,216,238,.28); padding:1px 8px; border-radius:999px;
+                    font-variant-numeric:tabular-nums; }
+
+    #ut-tab-overview:checked ~ .ut-tabs label[for="ut-tab-overview"],
+    #ut-tab-sessions:checked ~ .ut-tabs label[for="ut-tab-sessions"],
+    #ut-tab-projects:checked ~ .ut-tabs label[for="ut-tab-projects"],
+    #ut-tab-agent:checked ~ .ut-tabs label[for="ut-tab-agent"] { color:#fff; }
+    #ut-tab-overview:checked ~ .ut-tabs label[for="ut-tab-overview"]::after,
+    #ut-tab-sessions:checked ~ .ut-tabs label[for="ut-tab-sessions"]::after,
+    #ut-tab-projects:checked ~ .ut-tabs label[for="ut-tab-projects"]::after,
+    #ut-tab-agent:checked ~ .ut-tabs label[for="ut-tab-agent"]::after {
+        content:""; position:absolute; left:12px; right:12px; bottom:-1px; height:3px;
+        border-radius:3px 3px 0 0; background:var(--color-sky-blue); box-shadow:0 -2px 12px rgba(96,216,238,.45);
+    }
+    #ut-tab-overview:checked ~ .ut-tabs label[for="ut-tab-overview"] .ut-tab-count,
+    #ut-tab-sessions:checked ~ .ut-tabs label[for="ut-tab-sessions"] .ut-tab-count,
+    #ut-tab-projects:checked ~ .ut-tabs label[for="ut-tab-projects"] .ut-tab-count,
+    #ut-tab-agent:checked ~ .ut-tabs label[for="ut-tab-agent"] .ut-tab-count {
+        color:#0C1629; background:var(--color-sky-blue); border-color:var(--color-sky-blue);
+    }
+    #ut-tab-overview:focus-visible ~ .ut-tabs label[for="ut-tab-overview"],
+    #ut-tab-sessions:focus-visible ~ .ut-tabs label[for="ut-tab-sessions"],
+    #ut-tab-projects:focus-visible ~ .ut-tabs label[for="ut-tab-projects"],
+    #ut-tab-agent:focus-visible ~ .ut-tabs label[for="ut-tab-agent"] {
+        outline:2px solid var(--color-sky-blue); outline-offset:-2px;
+    }
+
+    .ut-pane { display:none; animation:utFade .18s ease; }
+    #ut-tab-overview:checked ~ [data-pane="overview"],
+    #ut-tab-sessions:checked ~ [data-pane="sessions"],
+    #ut-tab-projects:checked ~ [data-pane="projects"],
+    #ut-tab-agent:checked ~ [data-pane="agent"] { display:block; }
+    @@keyframes utFade { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+    @@media (prefers-reduced-motion: reduce) { .ut-pane { animation:none; } .ut-dot { animation:none; } }
+
     .ut-kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:20px; }
     .ut-kpi { position:relative; background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.015));
               border:1px solid rgba(253,251,255,.12); border-radius:14px; padding:20px 22px; overflow:hidden; }
@@ -236,7 +340,7 @@
     .ut-kpi-value { margin-top:14px; font-size:38px; font-weight:600; letter-spacing:-.02em; line-height:1; }
     .ut-kpi-sub { margin-top:8px; font-size:13px; color:var(--neutral-400); }
 
-    .ut-section { margin-top:40px; }
+    .ut-section { margin-top:6px; }
     .ut-sec-head { display:flex; align-items:baseline; gap:12px; margin-bottom:16px; }
     .ut-sec-head h2, .ut-sec-head-col h2 { font-size:22px; }
     .ut-sec-head-col { margin-bottom:16px; }
@@ -259,6 +363,12 @@
     .ut-meta { margin-top:5px; font-size:12px; color:var(--neutral-400); padding-left:17px; }
     .ut-plat-dot { width:9px; height:9px; border-radius:999px; flex-shrink:0; }
     .ut-metrics { display:flex; gap:20px; } .ut-num { text-align:right; }
+    .ut-models { display:flex; flex-direction:column; gap:5px; margin-top:3px; }
+    .ut-model-chip { display:inline-flex; align-items:center; gap:8px; font-size:12px;
+                     background:rgba(96,216,238,.08); border:1px solid rgba(96,216,238,.22);
+                     border-radius:999px; padding:2px 10px; }
+    .ut-model-name { color:var(--neutral-100); max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .ut-model-split { font-variant-numeric:tabular-nums; }
 
     .ut-badge { display:inline-block; margin-top:6px; font-size:12px; font-weight:600; padding:3px 10px; border-radius:999px; }
     .ut-badge--high { color:#5a7011; background:rgba(169,210,61,.22); }
@@ -288,7 +398,7 @@
     .ut-trow .in, .ut-trow .out { font-variant-numeric:tabular-nums; }
 
     /* Charts */
-    .ut-charts { display:grid; grid-template-columns:2fr 1fr; gap:16px; margin-top:20px; }
+    .ut-charts { display:grid; grid-template-columns:2fr 1fr; gap:16px; }
     .ut-panel { background:rgba(22,32,58,.7); border:1px solid rgba(253,251,255,.12); border-radius:14px; padding:22px 24px; }
     .ut-panel--full { grid-column:1 / -1; }
     .ut-panel-head { margin-bottom:8px; }
@@ -300,7 +410,8 @@
     .ut .mud-chart-legend, .ut .mud-chart-legend .mud-typography { color:var(--neutral-300); }
     .ut .mud-charts-gridlines-fullgrid line, .ut .mud-charts-xaxis line, .ut .mud-charts-yaxis line { stroke:rgba(253,251,255,.08); }
 
-    @@media (max-width:1000px){ .ut-kpis,.ut-cards{grid-template-columns:repeat(2,1fr);} .ut-charts{grid-template-columns:1fr;} }
+    @@media (max-width:1000px){ .ut-kpis,.ut-cards{grid-template-columns:repeat(2,1fr);} .ut-charts{grid-template-columns:1fr;}
+                                .ut-tabs{overflow-x:auto; scrollbar-width:none;} .ut-tab{white-space:nowrap;} }
 </style>
 
 @code {

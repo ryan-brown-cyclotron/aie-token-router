@@ -5,6 +5,7 @@ using UsageTracker;
 using UsageTracker.Contracts;
 using UsageTracker.Daemon;
 using UsageTracker.Daemon.Auth;
+using UsageTracker.Daemon.Compression;
 using UsageTracker.Daemon.Configuration;
 using UsageTracker.Daemon.Mcp;
 
@@ -14,7 +15,6 @@ var builder = WebApplication.CreateBuilder(args);
 var bootstrapConfig = LoadBootstrapConfig();
 var mcpEnabled = bootstrapConfig.McpEnabled;
 var mcpPort = bootstrapConfig.McpPort > 0 ? bootstrapConfig.McpPort : CompressionModes.DefaultMcpPort;
-var compressionOff = string.Equals(bootstrapConfig.CompressionMode, CompressionModes.Off, StringComparison.OrdinalIgnoreCase);
 
 // Local IPC transport: named pipe on Windows, Unix domain socket elsewhere. Both are per-user, so the
 // OS access control is the primary local trust boundary; the X-Local-Token below is defense-in-depth.
@@ -53,11 +53,16 @@ builder.Services.AddScoped<CommandProcessor>();
 builder.Services.AddSingleton<IUserContext, DaemonUserContext>();
 builder.Services.AddUsageTrackerLibrary(builder.Configuration);
 
-// Compression mode: "off" drops the compressor so ToolOutputCompressionService resolves null and hooks
-// ingest/mirror without computing a modifiedResult. "local" (default) keeps the Library's default
-// compressor, which the daemon runs locally with no backend round-trip.
-if (compressionOff)
-    builder.Services.RemoveAll<IToolOutputCompressor>();
+// Compression mode is resolved dynamically per hook (not baked in at startup), so `set-compression`
+// takes effect on the next command without a daemon restart - matching how RemoteEndpoint is resolved
+// per-call. ModeAwareToolOutputCompressor reads the current mode from config each call and dispatches:
+// "remote" (default) forwards to the backend (reusing RemoteEndpoint + the Entra bearer client), which
+// optionally forwards to the Headroom service; "local" compacts in-process with no backend round-trip;
+// "off" leaves the output unchanged.
+builder.Services.RemoveAll<IToolOutputCompressor>();
+builder.Services.AddSingleton<DeterministicToolOutputCompressor>();
+builder.Services.AddSingleton<RemoteToolOutputCompressor>();
+builder.Services.AddSingleton<IToolOutputCompressor, ModeAwareToolOutputCompressor>();
 
 // Local MCP endpoint (project-context tools) over loopback HTTP. Thin wrappers delegate to the Library.
 if (mcpEnabled)
@@ -113,7 +118,7 @@ app.MapGet("/status", (EntraTokenService tokens, DaemonConfigStore store) =>
         user = status.UserEmail,
         expiresOn = status.ExpiresOn,
         deviceCode = status.PendingDeviceCodeMessage,
-        compression = string.IsNullOrWhiteSpace(config.CompressionMode) ? CompressionModes.Local : config.CompressionMode,
+        compression = string.IsNullOrWhiteSpace(config.CompressionMode) ? CompressionModes.Remote : config.CompressionMode,
         mcp = config.McpEnabled ? $"http://127.0.0.1:{(config.McpPort > 0 ? config.McpPort : CompressionModes.DefaultMcpPort)}/mcp" : "disabled",
     });
 });

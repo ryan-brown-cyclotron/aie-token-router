@@ -16,6 +16,14 @@ public sealed class SessionRecord
     public TokenUsage Usage { get; set; } = TokenUsage.Empty;
     public int ToolCalls { get; set; }
     public readonly ConcurrentDictionary<string, int> EventCounts = new();
+
+    /// <summary>
+    /// Per-model token split within this session. A session may span multiple models
+    /// (e.g. a model switch mid-session), so token usage is accumulated per resolved
+    /// model here in addition to the session-wide <see cref="Usage"/> total. The single
+    /// <see cref="Model"/> above remains the most-recently-seen model.
+    /// </summary>
+    public readonly ConcurrentDictionary<string, TokenUsage> ModelUsage = new();
 }
 
 /// <summary>
@@ -44,13 +52,19 @@ public sealed class UsageStore
         session.ProjectName = attribution.ProjectName;
         session.AttributionConfidence = attribution.Confidence;
 
-        if (!string.IsNullOrEmpty(evt.Model)) session.Model = evt.Model;
-        else if (!string.IsNullOrEmpty(modelFromTranscript)) session.Model = modelFromTranscript;
+        // Resolve the model for this event with the same precedence as the durable
+        // NormalizedUsageEvent (payload model -> transcript model -> "unknown") so the
+        // per-model split keys match the model labels shown elsewhere on the dashboard.
+        var model = !string.IsNullOrEmpty(evt.Model) ? evt.Model
+            : !string.IsNullOrEmpty(modelFromTranscript) ? modelFromTranscript
+            : "unknown";
+        if (model != "unknown") session.Model = model;
 
         if (evt.EventName.Equals("PreToolUse", StringComparison.OrdinalIgnoreCase))
             session.ToolCalls++;
 
         session.Usage = session.Usage.Add(delta);
+        session.ModelUsage.AddOrUpdate(model, delta, (_, existing) => existing.Add(delta));
     }
 
     public IReadOnlyCollection<SessionRecord> AllSessions() => _sessions.Values.ToList();

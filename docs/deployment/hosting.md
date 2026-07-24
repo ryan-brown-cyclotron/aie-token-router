@@ -20,13 +20,13 @@ UsageTracker.Functions
 1. **Azure Functions can run as containers.** Functions supports containerized function
    apps that run in an Azure Container Apps environment, making it straightforward to
    deploy and run function apps as Linux containers you create and maintain.
-2. **Functions on Azure Container Apps includes sidecar support, if ever needed.** The
-   integration gives Function apps access to Azure Container Apps features — including
-   sidecars — when deployed through the `Microsoft.App` resource provider with
-   `kind=functionapp`. Tool output compression does not require this today: it is an
-   in-process extension point (`IToolOutputCompressor`), not a sidecar. A host that
-   later wants to run its own compressor as a sidecar rather than in-process still has
-   that option available.
+2. **Functions on Azure Container Apps includes sidecar support.** The integration gives
+   Function apps access to Azure Container Apps features — including sidecars — when
+   deployed through the `Microsoft.App` resource provider with `kind=functionapp`. This
+   is used by the **Headroom compression sidecar** (`src/UsageTracker.Compressor.Headroom`,
+   a FastAPI service): the backend forwards tool output to it when `CompressionEndpoint`
+   is configured. In-process compaction (`IToolOutputCompressor`) remains the fallback,
+   so the sidecar is optional.
 3. **Functions can run beside other containers.** The model is intended for running
    Functions alongside other containerized apps such as microservices, APIs, or
    websites.
@@ -47,7 +47,7 @@ UsageTracker.Functions container
         |   and a host-registered IToolOutputCompressor:
                 |
                 v
-        compressor invoked (none registered by default -> no-op, fail open)
+        compressor invoked (Headroom sidecar if CompressionEndpoint set, else local; fail open)
                 |
                 v
         compressed output returned by Function
@@ -85,9 +85,10 @@ builder.Build().Run();
 The AppHost uses stable Aspire packages: `Aspire.Hosting.Azure.CosmosDB` and
 `Aspire.Hosting.Azure.Functions` (both net8). `Aspire.Hosting.Azure.Functions` is
 stable, so `AddAzureFunctionsProject` is used for the Functions project rather than the
-generic `AddProject`. There is no compression sidecar in the app model; a host that
-wants compression registers its own `IToolOutputCompressor` in the Functions
-composition root (see [tool-output-compression.md](../design/tool-output-compression.md)).
+generic `AddProject`. The Headroom compression sidecar is added with `AddDockerfile`
+(it's a FastAPI/Python container, not a .NET project) and its endpoint is passed to the
+Functions app via the `CompressionEndpoint` environment variable
+(see [tool-output-compression.md](../design/tool-output-compression.md)).
 
 ## Dashboard deploys separately
 
